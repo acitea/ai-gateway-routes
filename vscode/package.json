@@ -1,0 +1,83 @@
+{
+  "name": "ai-gateway-routes-vscode",
+  "displayName": "AI Gateway Routes",
+  "description": "Validate, compile, and visualize ai-gateway-routes YAML manifests.",
+  "version": "0.1.0",
+  "publisher": "ai-gateway-routes",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Visualization"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:ai-gateway-route-yaml",
+    "onCommand:aiGatewayRoutes.preview",
+    "onCommand:aiGatewayRoutes.compile",
+    "onCommand:aiGatewayRoutes.copyMermaid"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "ai-gateway-route-yaml",
+        "aliases": [
+          "AI Gateway Route YAML",
+          "ai-gateway-route"
+        ],
+        "extensions": [
+          ".ai-gateway-route.yaml",
+          ".ai-gateway-route.yml",
+          ".agroute.yaml",
+          ".agroute.yml"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "aiGatewayRoutes.preview",
+        "title": "AI Gateway Routes: Preview Flow"
+      },
+      {
+        "command": "aiGatewayRoutes.compile",
+        "title": "AI Gateway Routes: Compile to JSON"
+      },
+      {
+        "command": "aiGatewayRoutes.copyMermaid",
+        "title": "AI Gateway Routes: Copy Mermaid"
+      }
+    ],
+    "yamlValidation": [
+      {
+        "fileMatch": [
+          "*.ai-gateway-route.yaml",
+          "*.ai-gateway-route.yml",
+          "*.agroute.yaml",
+          "*.agroute.yml"
+        ],
+        "url": "./schemas/ai-gateway-route.schema.json"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "aiGatewayRoutes.preview",
+          "when": "resourceFilename =~ /.*\\.(ai-gateway-route|agroute)\\.ya?ml$/",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "ai-gateway-routes": "file:.."
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.2.1"
+  },
+  "scripts": {
+    "package": "vsce package"
+  }
+}

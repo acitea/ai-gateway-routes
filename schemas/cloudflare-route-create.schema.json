@@ -1,0 +1,336 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Extracted from https://raw.githubusercontent.com/cloudflare/api-schemas/main/openapi.json at path POST /accounts/{account_id}/ai-gateway/gateways/{gateway_id}/routes.",
+  "properties": {
+    "elements": {
+      "items": {
+        "oneOf": [
+          {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "outputs": {
+                "properties": {
+                  "next": {
+                    "properties": {
+                      "elementId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "elementId"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "next"
+                ],
+                "type": "object"
+              },
+              "type": {
+                "enum": [
+                  "start"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "outputs",
+              "type"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "outputs": {
+                "properties": {
+                  "false": {
+                    "properties": {
+                      "elementId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "elementId"
+                    ],
+                    "type": "object"
+                  },
+                  "true": {
+                    "properties": {
+                      "elementId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "elementId"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "true",
+                  "false"
+                ],
+                "type": "object"
+              },
+              "properties": {
+                "properties": {
+                  "conditions": {
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "type": {
+                "enum": [
+                  "conditional"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "outputs",
+              "type",
+              "properties"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "outputs": {
+                "additionalProperties": {
+                  "properties": {
+                    "elementId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "elementId"
+                  ],
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              "type": {
+                "enum": [
+                  "percentage"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "outputs",
+              "type"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "outputs": {
+                "properties": {
+                  "fallback": {
+                    "properties": {
+                      "elementId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "elementId"
+                    ],
+                    "type": "object"
+                  },
+                  "success": {
+                    "properties": {
+                      "elementId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "elementId"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "success",
+                  "fallback"
+                ],
+                "type": "object"
+              },
+              "properties": {
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "limit": {
+                    "type": "number"
+                  },
+                  "limitType": {
+                    "enum": [
+                      "count",
+                      "cost"
+                    ],
+                    "type": "string"
+                  },
+                  "window": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "limitType",
+                  "key",
+                  "limit",
+                  "window"
+                ],
+                "type": "object"
+              },
+              "type": {
+                "enum": [
+                  "rate"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "outputs",
+              "type",
+              "properties"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "outputs": {
+                "properties": {
+                  "fallback": {
+                    "properties": {
+                      "elementId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "elementId"
+                    ],
+                    "type": "object"
+                  },
+                  "success": {
+                    "properties": {
+                      "elementId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "elementId"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "success",
+                  "fallback"
+                ],
+                "type": "object"
+              },
+              "properties": {
+                "properties": {
+                  "model": {
+                    "type": "string"
+                  },
+                  "provider": {
+                    "type": "string"
+                  },
+                  "retries": {
+                    "type": "number"
+                  },
+                  "timeout": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "model",
+                  "timeout",
+                  "retries"
+                ],
+                "type": "object"
+              },
+              "type": {
+                "enum": [
+                  "model"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "outputs",
+              "type",
+              "properties"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "outputs": {
+                "additionalProperties": {
+                  "properties": {
+                    "elementId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "elementId"
+                  ],
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              "type": {
+                "enum": [
+                  "end"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "outputs",
+              "type"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "elements"
+  ],
+  "type": "object"
+}

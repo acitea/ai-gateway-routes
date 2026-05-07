@@ -1,0 +1,51 @@
+{
+  "name": "ai-gateway-routes",
+  "version": "0.1.0",
+  "description": "Type-safe builder DSL for Cloudflare AI Gateway dynamic routes.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "ai-gateway-routes": "./dist/cli.js",
+    "agr": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "examples",
+    "schemas",
+    "scripts/update-cloudflare-schema.mjs",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "schema:update": "node scripts/update-cloudflare-schema.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "keywords": [
+    "cloudflare",
+    "ai-gateway",
+    "routes",
+    "dsl",
+    "typescript"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "yaml": "^2.8.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.1"
+  }
+}

@@ -1,0 +1,29 @@
+name: auth-router
+start: check-auth
+
+nodes:
+  check-auth:
+    conditional:
+      conditions:
+        metadata.signed_in:
+          $eq: true
+      true: openai
+      false: nvidia
+
+  openai:
+    model:
+      provider: openai
+      model: gpt-4.1-mini
+      timeout: 30
+      retries: 2
+      success: end
+      fallback: nvidia
+
+  nvidia:
+    model:
+      provider: custom-nvidia
+      model: nvidia/llama-3.1-nemotron-nano-8b-v1
+      timeout: 30
+      retries: 2
+      success: end
+      fallback: end

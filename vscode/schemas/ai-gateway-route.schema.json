@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AI Gateway Route YAML",
+  "type": "object",
+  "required": [
+    "name",
+    "start",
+    "nodes"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "start": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The first node id to connect from the implicit start element."
+    },
+    "nodes": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "model"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "model": {
+                "type": "object",
+                "required": [
+                  "provider",
+                  "model",
+                  "timeout",
+                  "retries",
+                  "success",
+                  "fallback"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "timeout": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "retries": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "success": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "fallback": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "conditional"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "conditional": {
+                "type": "object",
+                "required": [
+                  "conditions",
+                  "true",
+                  "false"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "conditions": {
+                    "type": "object"
+                  },
+                  "true": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "false": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "rate"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "rate": {
+                "type": "object",
+                "required": [
+                  "limitType",
+                  "key",
+                  "limit",
+                  "window",
+                  "success",
+                  "fallback"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "limitType": {
+                    "enum": [
+                      "count",
+                      "cost"
+                    ],
+                    "type": "string"
+                  },
+                  "key": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "limit": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "window": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "success": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "fallback": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "percentage"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "percentage": {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "fractional"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "fractional": {
+                "type": "object",
+                "required": [
+                  "buckets"
+                ],
+                "additionalProperties": false,
+                "patternProperties": {
+                  "^bucket\\d+$": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "properties": {
+                  "buckets": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

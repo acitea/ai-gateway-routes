@@ -40,7 +40,7 @@ function nodeShape(element: RouteElement): string {
 }
 
 function nodeId(id: string): string {
-  return id.replace(/[^A-Za-z0-9_]/g, "_");
+  return `node_${id.replace(/[^A-Za-z0-9_]/g, "_")}`;
 }
 
 function escapeLabel(label: string): string {

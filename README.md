@@ -17,32 +17,36 @@ Write a route manifest:
 name: auth-router
 start: check-auth
 
+models:
+  openai:
+    provider: openai
+    model: gpt-4.1-mini
+    timeout: 30
+    retries: 2
+
+  nvidia:
+    provider: custom-nvidia
+    model: nvidia/llama-3.1-nemotron-nano-8b-v1
+    timeout: 30
+    retries: 2
+
 nodes:
   check-auth:
     conditional:
       conditions:
         metadata.signed_in:
           $eq: true
-      true: openai
-      false: nvidia
-
-  openai:
-    model:
-      provider: openai
-      model: gpt-4.1-mini
-      timeout: 30
-      retries: 2
-      success: end
-      fallback: nvidia
-
-  nvidia:
-    model:
-      provider: custom-nvidia
-      model: nvidia/llama-3.1-nemotron-nano-8b-v1
-      timeout: 30
-      retries: 2
-      success: end
-      fallback: end
+      true:
+        model: openai
+        success: end
+        fallback:
+          model: nvidia
+          success: end
+          fallback: end
+      false:
+        model: nvidia
+        success: end
+        fallback: end
 ```
 
 Validate and compile it:
@@ -56,6 +60,7 @@ The YAML format is intentionally manifest-like:
 
 - `name` is the Cloudflare dynamic route name.
 - `start` points to the first node.
+- `models` is an optional catalog of model configurations that nodes can reference.
 - `nodes` is a map of node IDs to exactly one node type.
 - `end` is implicit and can be used as an output target.
 
@@ -92,6 +97,41 @@ ai-gateway-routes deploy auth-router.ai-gateway-route.yaml
 ```
 
 ## YAML Element Types
+
+Outputs can point to an existing node ID or define an inline node. Inline nodes are expanded into generated IDs when compiled, so Cloudflare still receives a flat `elements` array.
+
+```yaml
+nodes:
+  check-auth:
+    conditional:
+      conditions:
+        metadata.signed_in:
+          $eq: true
+      true:
+        model: openai
+        success: end
+        fallback: end
+      false: nvidia
+```
+
+### Model Catalog
+
+```yaml
+models:
+  openai:
+    provider: openai
+    model: gpt-4.1-mini
+    timeout: 30
+    retries: 2
+
+nodes:
+  generate:
+    model: openai
+    success: end
+    fallback: end
+```
+
+Catalog references are optional. You can still define a model inline when you need a one-off node.
 
 ### Conditional
 
@@ -201,19 +241,19 @@ const route = defineRoute("auth-router", (b) => {
     conditions: { "metadata.signed_in": { $eq: true } },
   });
 
-  const openai = b.model("openai", {
-    provider: "openai",
-    model: "gpt-4.1-mini",
-        timeout: 30,
-        retries: 2,
-  });
+const openai = b.model("openai", {
+  provider: "openai",
+  model: "gpt-4.1-mini",
+  timeout: 30,
+  retries: 2,
+});
 
-  const nvidia = b.model("nvidia", {
-    provider: "custom-nvidia",
-    model: "nvidia/llama-3.1-nemotron-nano-8b-v1",
-        timeout: 30,
-        retries: 2,
-  });
+const nvidia = b.model("nvidia", {
+  provider: "custom-nvidia",
+  model: "nvidia/llama-3.1-nemotron-nano-8b-v1",
+  timeout: 30,
+  retries: 2,
+});
 
   b.fromStart().to(checkAuth);
 
@@ -412,18 +452,21 @@ Output:
 
 ```mermaid
 flowchart TD
-  start([start])
-  check_auth{check-auth}
-  openai[openai]
-  nvidia[nvidia]
-  end([end])
-  start -->|next| check_auth
-  check_auth -->|true| openai
-  check_auth -->|false| nvidia
-  openai -->|success| end
-  openai -->|fallback| nvidia
-  nvidia -->|success| end
-  nvidia -->|fallback| end
+  node_start([start])
+  node_check_auth{check-auth}
+  node_check_auth_true[check-auth-true]
+  node_check_auth_true_fallback[check-auth-true-fallback]
+  node_check_auth_false[check-auth-false]
+  node_end([end])
+  node_start -->|next| node_check_auth
+  node_check_auth -->|true| node_check_auth_true
+  node_check_auth -->|false| node_check_auth_false
+  node_check_auth_true -->|success| node_end
+  node_check_auth_true -->|fallback| node_check_auth_true_fallback
+  node_check_auth_true_fallback -->|success| node_end
+  node_check_auth_true_fallback -->|fallback| node_end
+  node_check_auth_false -->|success| node_end
+  node_check_auth_false -->|fallback| node_end
 ```
 
 ## Notes

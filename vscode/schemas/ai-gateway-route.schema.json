@@ -14,9 +14,47 @@
       "minLength": 1
     },
     "start": {
-      "type": "string",
-      "minLength": 1,
-      "description": "The first node id to connect from the implicit start element."
+      "description": "The first node id or inline node to connect from the implicit start element.",
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "object"
+        }
+      ]
+    },
+    "models": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "provider",
+          "model",
+          "timeout",
+          "retries"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "timeout": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "retries": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
     },
     "nodes": {
       "type": "object",
@@ -30,42 +68,104 @@
             "additionalProperties": false,
             "properties": {
               "model": {
-                "type": "object",
-                "required": [
-                  "provider",
-                  "model",
-                  "timeout",
-                  "retries",
-                  "success",
-                  "fallback"
-                ],
-                "additionalProperties": false,
-                "properties": {
-                  "provider": {
-                    "type": "string",
-                    "minLength": 1
+                "allOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "provider",
+                      "model",
+                      "timeout",
+                      "retries"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "timeout": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "retries": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    }
                   },
-                  "model": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "timeout": {
-                    "type": "number",
-                    "exclusiveMinimum": 0
-                  },
-                  "retries": {
-                    "type": "integer",
-                    "minimum": 0
-                  },
-                  "success": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "fallback": {
-                    "type": "string",
-                    "minLength": 1
+                  {
+                    "type": "object",
+                    "required": [
+                      "success",
+                      "fallback"
+                    ],
+                    "properties": {
+                      "success": {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "object"
+                          }
+                        ]
+                      },
+                      "fallback": {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "object"
+                          }
+                        ]
+                      }
+                    }
                   }
-                }
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "model",
+              "success",
+              "fallback"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "success": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "object"
+                  }
+                ]
+              },
+              "fallback": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "object"
+                  }
+                ]
               }
             }
           },
@@ -89,12 +189,26 @@
                     "type": "object"
                   },
                   "true": {
-                    "type": "string",
-                    "minLength": 1
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "object"
+                      }
+                    ]
                   },
                   "false": {
-                    "type": "string",
-                    "minLength": 1
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "object"
+                      }
+                    ]
                   }
                 }
               }
@@ -139,12 +253,26 @@
                     "exclusiveMinimum": 0
                   },
                   "success": {
-                    "type": "string",
-                    "minLength": 1
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "object"
+                      }
+                    ]
                   },
                   "fallback": {
-                    "type": "string",
-                    "minLength": 1
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "object"
+                      }
+                    ]
                   }
                 }
               }
@@ -161,8 +289,15 @@
                 "type": "object",
                 "minProperties": 1,
                 "additionalProperties": {
-                  "type": "string",
-                  "minLength": 1
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "object"
+                    }
+                  ]
                 }
               }
             }
@@ -182,8 +317,15 @@
                 "additionalProperties": false,
                 "patternProperties": {
                   "^bucket\\d+$": {
-                    "type": "string",
-                    "minLength": 1
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "object"
+                      }
+                    ]
                   }
                 },
                 "properties": {

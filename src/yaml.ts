@@ -10,6 +10,61 @@ import type {
 } from "./types.js";
 import { ConditionsSchema } from "./validator.js";
 
+type YamlTarget = string | RawYamlNode;
+
+type RawModelConfig = {
+  provider: string;
+  model: string;
+  timeout: number;
+  retries: number;
+};
+
+type RawYamlRoute = {
+  name: string;
+  start: YamlTarget;
+  models?: Record<string, RawModelConfig>;
+  nodes: Record<string, RawYamlNode>;
+};
+
+type RawYamlNode =
+  | {
+      model: string;
+      success: YamlTarget;
+      fallback: YamlTarget;
+    }
+  | {
+      model: RawModelConfig & {
+        success: YamlTarget;
+        fallback: YamlTarget;
+      };
+    }
+  | {
+      conditional: {
+        conditions: z.infer<typeof ConditionsSchema>;
+        true: YamlTarget;
+        false: YamlTarget;
+      };
+    }
+  | {
+      rate: {
+        limitType: "count" | "cost";
+        key: string;
+        limit: number;
+        window: number;
+        success: YamlTarget;
+        fallback: YamlTarget;
+      };
+    }
+  | {
+      percentage: Record<string, YamlTarget>;
+    }
+  | {
+      fractional: {
+        buckets: number[];
+        [outputName: `bucket${number}`]: YamlTarget;
+      };
+    };
+
 export type YamlDiagnosticSeverity = "error" | "warning";
 
 export type YamlDiagnostic = {
@@ -19,28 +74,45 @@ export type YamlDiagnostic = {
   severity: YamlDiagnosticSeverity;
 };
 
-export const YamlModelNodeSchema = z
+const YamlTargetSchema: z.ZodType<YamlTarget> = z.lazy(() =>
+  z.union([z.string().min(1), YamlNodeSchema]),
+);
+
+const YamlModelConfigSchema = z
   .object({
-    model: z
-      .object({
-        provider: z.string().min(1),
-        model: z.string().min(1),
-        timeout: z.number().positive(),
-        retries: z.number().int().nonnegative(),
-        success: z.string().min(1),
-        fallback: z.string().min(1),
-      })
-      .strict(),
+    provider: z.string().min(1),
+    model: z.string().min(1),
+    timeout: z.number().positive(),
+    retries: z.number().int().nonnegative(),
   })
   .strict();
+
+export const YamlModelNodeSchema = z
+  .union([
+    z
+      .object({
+        model: YamlModelConfigSchema.extend({
+          success: YamlTargetSchema,
+          fallback: YamlTargetSchema,
+        }).strict(),
+      })
+      .strict(),
+    z
+      .object({
+        model: z.string().min(1),
+        success: YamlTargetSchema,
+        fallback: YamlTargetSchema,
+      })
+      .strict(),
+  ]);
 
 export const YamlConditionalNodeSchema = z
   .object({
     conditional: z
       .object({
         conditions: ConditionsSchema,
-        true: z.string().min(1),
-        false: z.string().min(1),
+        true: YamlTargetSchema,
+        false: YamlTargetSchema,
       })
       .strict(),
   })
@@ -52,7 +124,7 @@ export const YamlFractionalNodeSchema = z
       .object({
         buckets: z.array(z.number().nonnegative()).min(1),
       })
-      .catchall(z.string().min(1))
+      .catchall(YamlTargetSchema)
       .superRefine((node, context) => {
         const expectedOutputs = node.buckets.map((_, index) => `bucket${index}`);
         const outputNames = Object.keys(node).filter((key) => key !== "buckets");
@@ -91,7 +163,7 @@ export const YamlFractionalNodeSchema = z
 
 export const YamlPercentageNodeSchema = z
   .object({
-    percentage: z.record(z.string().min(1), z.string().min(1)).refine(
+    percentage: z.record(z.string().min(1), YamlTargetSchema).refine(
       (outputs) => Object.keys(outputs).length > 0,
       "Percentage nodes must define at least one output.",
     ),
@@ -106,8 +178,8 @@ export const YamlRateNodeSchema = z
         key: z.string().min(1),
         limit: z.number().positive(),
         window: z.number().positive(),
-        success: z.string().min(1),
-        fallback: z.string().min(1),
+        success: YamlTargetSchema,
+        fallback: YamlTargetSchema,
       })
       .strict(),
   })
@@ -124,7 +196,8 @@ export const YamlNodeSchema = z.union([
 export const YamlRouteSchema = z
   .object({
     name: z.string().min(1),
-    start: z.string().min(1),
+    start: YamlTargetSchema,
+    models: z.record(z.string().min(1), YamlModelConfigSchema).optional(),
     nodes: z.record(z.string().min(1), YamlNodeSchema),
   })
   .strict();
@@ -140,108 +213,14 @@ export const YamlRouteJsonSchema = {
   additionalProperties: false,
   properties: {
     name: { type: "string", minLength: 1 },
-    start: {
-      type: "string",
-      minLength: 1,
-      description: "The first node id to connect from the implicit start element.",
+    start: makeTargetJsonSchema("The first node id or inline node to connect from the implicit start element."),
+    models: {
+      type: "object",
+      additionalProperties: makeModelConfigJsonSchema(),
     },
     nodes: {
       type: "object",
-      additionalProperties: {
-        oneOf: [
-          {
-            type: "object",
-            required: ["model"],
-            additionalProperties: false,
-            properties: {
-              model: {
-                type: "object",
-                required: ["provider", "model", "timeout", "retries", "success", "fallback"],
-                additionalProperties: false,
-                properties: {
-                  provider: { type: "string", minLength: 1 },
-                  model: { type: "string", minLength: 1 },
-                  timeout: { type: "number", exclusiveMinimum: 0 },
-                  retries: { type: "integer", minimum: 0 },
-                  success: { type: "string", minLength: 1 },
-                  fallback: { type: "string", minLength: 1 },
-                },
-              },
-            },
-          },
-          {
-            type: "object",
-            required: ["conditional"],
-            additionalProperties: false,
-            properties: {
-              conditional: {
-                type: "object",
-                required: ["conditions", "true", "false"],
-                additionalProperties: false,
-                properties: {
-                  conditions: { type: "object" },
-                  true: { type: "string", minLength: 1 },
-                  false: { type: "string", minLength: 1 },
-                },
-              },
-            },
-          },
-          {
-            type: "object",
-            required: ["rate"],
-            additionalProperties: false,
-            properties: {
-              rate: {
-                type: "object",
-                required: ["limitType", "key", "limit", "window", "success", "fallback"],
-                additionalProperties: false,
-                properties: {
-                  limitType: { enum: ["count", "cost"], type: "string" },
-                  key: { type: "string", minLength: 1 },
-                  limit: { type: "number", exclusiveMinimum: 0 },
-                  window: { type: "number", exclusiveMinimum: 0 },
-                  success: { type: "string", minLength: 1 },
-                  fallback: { type: "string", minLength: 1 },
-                },
-              },
-            },
-          },
-          {
-            type: "object",
-            required: ["percentage"],
-            additionalProperties: false,
-            properties: {
-              percentage: {
-                type: "object",
-                minProperties: 1,
-                additionalProperties: { type: "string", minLength: 1 },
-              },
-            },
-          },
-          {
-            type: "object",
-            required: ["fractional"],
-            additionalProperties: false,
-            properties: {
-              fractional: {
-                type: "object",
-                required: ["buckets"],
-                additionalProperties: false,
-                patternProperties: {
-                  "^bucket\\d+$": { type: "string", minLength: 1 },
-                },
-                properties: {
-                  buckets: {
-                    type: "array",
-                    minItems: 1,
-                    items: { type: "number", minimum: 0 },
-                  },
-                },
-              },
-            },
-          },
-        ],
-      },
+      additionalProperties: makeNodeJsonSchema(),
     },
   },
 } as const;
@@ -252,88 +231,136 @@ export function parseYamlRoute(source: string): YamlRoute {
 }
 
 export function yamlRouteToGraph(route: YamlRoute): RouteGraph {
-  const elements: ElementDraft[] = [
-    {
-      id: "start",
-      type: "start",
-      outputs: new Map([["next", route.start]]),
-      requiredOutputs: ["next"],
-    },
-  ];
+  const rawRoute = route as RawYamlRoute;
+  const startElement: ElementDraft = {
+    id: "start",
+    type: "start",
+    outputs: new Map(),
+    requiredOutputs: ["next"],
+  };
+  const elements: ElementDraft[] = [startElement];
+  const usedIds = new Set(["start", "end", ...Object.keys(rawRoute.nodes)]);
 
-  for (const [id, node] of Object.entries(route.nodes)) {
+  function resolveTarget(target: YamlTarget, preferredId: string): string {
+    if (typeof target === "string") {
+      return target;
+    }
+
+    const inlineId = reserveInlineId(preferredId, usedIds);
+    addNode(inlineId, target);
+    return inlineId;
+  }
+
+  function addNode(id: string, node: RawYamlNode): void {
     if ("model" in node) {
+      if (typeof node.model === "string") {
+        const modelNode = node as {
+          model: string;
+          success: YamlTarget;
+          fallback: YamlTarget;
+        };
+        const model = rawRoute.models?.[modelNode.model];
+        if (model === undefined) {
+          throw new Error(`Model "${modelNode.model}" is not defined in root models.`);
+        }
+
+        const element: ElementDraft = {
+          id,
+          type: "model",
+          properties: model,
+          outputs: new Map(),
+          requiredOutputs: ["success", "fallback"],
+        };
+        elements.push(element);
+        element.outputs.set("success", resolveTarget(modelNode.success, `${id}-success`));
+        element.outputs.set("fallback", resolveTarget(modelNode.fallback, `${id}-fallback`));
+        return;
+      }
+
       const { success, fallback, ...properties } = node.model;
-      elements.push({
+      const element: ElementDraft = {
         id,
         type: "model",
         properties,
-        outputs: new Map([
-          ["success", success],
-          ["fallback", fallback],
-        ]),
+        outputs: new Map(),
         requiredOutputs: ["success", "fallback"],
-      });
-      continue;
+      };
+      elements.push(element);
+      element.outputs.set("success", resolveTarget(success, `${id}-success`));
+      element.outputs.set("fallback", resolveTarget(fallback, `${id}-fallback`));
+      return;
     }
 
     if ("conditional" in node) {
       const { conditions, true: trueTarget, false: falseTarget } = node.conditional;
-      elements.push({
+      const element: ElementDraft = {
         id,
         type: "conditional",
         properties: { conditions },
-        outputs: new Map([
-          ["true", trueTarget],
-          ["false", falseTarget],
-        ]),
+        outputs: new Map(),
         requiredOutputs: ["true", "false"],
-      });
-      continue;
+      };
+      elements.push(element);
+      element.outputs.set("true", resolveTarget(trueTarget, `${id}-true`));
+      element.outputs.set("false", resolveTarget(falseTarget, `${id}-false`));
+      return;
     }
 
     if ("rate" in node) {
       const { success, fallback, ...properties } = node.rate;
-      elements.push({
+      const element: ElementDraft = {
         id,
         type: "rate",
         properties,
-        outputs: new Map([
-          ["success", success],
-          ["fallback", fallback],
-        ]),
+        outputs: new Map(),
         requiredOutputs: ["success", "fallback"],
-      });
-      continue;
+      };
+      elements.push(element);
+      element.outputs.set("success", resolveTarget(success, `${id}-success`));
+      element.outputs.set("fallback", resolveTarget(fallback, `${id}-fallback`));
+      return;
     }
 
     if ("percentage" in node) {
       const outputs = node.percentage;
       const properties = { outputs: Object.keys(outputs) } satisfies PercentageProperties;
-      elements.push({
+      const element: ElementDraft = {
         id,
         type: "percentage",
         properties,
-        outputs: new Map(Object.entries(outputs)),
+        outputs: new Map(),
         requiredOutputs: properties.outputs,
-      });
-      continue;
+      };
+      elements.push(element);
+      for (const [outputName, target] of Object.entries(outputs)) {
+        element.outputs.set(outputName, resolveTarget(target, `${id}-${sanitizeIdPart(outputName)}`));
+      }
+      return;
     }
 
     const { buckets, ...outputs } = node.fractional;
     const outputNames = buckets.map(formatPercentageBucket);
-    elements.push({
+    const element: ElementDraft = {
       id,
       type: "percentage",
       properties: { buckets } satisfies FractionalProperties,
-      outputs: new Map(
-        Object.entries(outputs).map(([outputName, target]) => [
-          outputNames[Number(outputName.slice(6))] ?? outputName,
-          target as string,
-        ]),
-      ),
+      outputs: new Map(),
       requiredOutputs: outputNames,
-    });
+    };
+    elements.push(element);
+    for (const [outputName, target] of Object.entries(outputs)) {
+      const resolvedOutputName = outputNames[Number(outputName.slice(6))] ?? outputName;
+      element.outputs.set(
+        resolvedOutputName,
+        resolveTarget(target, `${id}-${sanitizeIdPart(resolvedOutputName)}`),
+      );
+    }
+  }
+
+  startElement.outputs.set("next", resolveTarget(rawRoute.start, "start-next"));
+
+  for (const [id, node] of Object.entries(rawRoute.nodes)) {
+    addNode(id, node);
   }
 
   elements.push({
@@ -382,13 +409,24 @@ export function validateYamlRoute(source: string): YamlDiagnostic[] {
     ];
   }
 
-  const graphIssues = validateRouteGraph(yamlRouteToGraph(route));
-  return graphIssues.map((issue) => ({
-    message: issue,
-    line: 0,
-    column: 0,
-    severity: "error",
-  }));
+  try {
+    const graphIssues = validateRouteGraph(yamlRouteToGraph(route));
+    return graphIssues.map((issue) => ({
+      message: issue,
+      line: 0,
+      column: 0,
+      severity: "error",
+    }));
+  } catch (error) {
+    return [
+      {
+        message: error instanceof Error ? error.message : "Invalid YAML route.",
+        line: 0,
+        column: 0,
+        severity: "error",
+      },
+    ];
+  }
 }
 
 function parseYamlDocument(source: string): unknown {
@@ -432,4 +470,154 @@ function formatPath(path: (string | number)[]): string {
 function formatPercentageBucket(bucket: number): string {
   const percentage = bucket * 100;
   return `${Number.isInteger(percentage) ? percentage : percentage.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")}%`;
+}
+
+function reserveInlineId(preferredId: string, usedIds: Set<string>): string {
+  const baseId = sanitizeIdPart(preferredId);
+  let candidate = baseId;
+  let suffix = 2;
+
+  while (usedIds.has(candidate)) {
+    candidate = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+
+  usedIds.add(candidate);
+  return candidate;
+}
+
+function sanitizeIdPart(value: string): string {
+  return value
+    .trim()
+    .replace(/[^A-Za-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "node";
+}
+
+function makeModelConfigJsonSchema(): object {
+  return {
+    type: "object",
+    required: ["provider", "model", "timeout", "retries"],
+    additionalProperties: false,
+    properties: {
+      provider: { type: "string", minLength: 1 },
+      model: { type: "string", minLength: 1 },
+      timeout: { type: "number", exclusiveMinimum: 0 },
+      retries: { type: "integer", minimum: 0 },
+    },
+  };
+}
+
+function makeTargetJsonSchema(description?: string): object {
+  return {
+    ...(description === undefined ? {} : { description }),
+    oneOf: [{ type: "string", minLength: 1 }, { type: "object" }],
+  };
+}
+
+function makeNodeJsonSchema(): object {
+  return {
+    oneOf: [
+      {
+        type: "object",
+        required: ["model"],
+        additionalProperties: false,
+        properties: {
+          model: {
+            allOf: [
+              makeModelConfigJsonSchema(),
+              {
+                type: "object",
+                required: ["success", "fallback"],
+                properties: {
+                  success: makeTargetJsonSchema(),
+                  fallback: makeTargetJsonSchema(),
+                },
+              },
+            ],
+          },
+        },
+      },
+      {
+        type: "object",
+        required: ["model", "success", "fallback"],
+        additionalProperties: false,
+        properties: {
+          model: { type: "string", minLength: 1 },
+          success: makeTargetJsonSchema(),
+          fallback: makeTargetJsonSchema(),
+        },
+      },
+      {
+        type: "object",
+        required: ["conditional"],
+        additionalProperties: false,
+        properties: {
+          conditional: {
+            type: "object",
+            required: ["conditions", "true", "false"],
+            additionalProperties: false,
+            properties: {
+              conditions: { type: "object" },
+              true: makeTargetJsonSchema(),
+              false: makeTargetJsonSchema(),
+            },
+          },
+        },
+      },
+      {
+        type: "object",
+        required: ["rate"],
+        additionalProperties: false,
+        properties: {
+          rate: {
+            type: "object",
+            required: ["limitType", "key", "limit", "window", "success", "fallback"],
+            additionalProperties: false,
+            properties: {
+              limitType: { enum: ["count", "cost"], type: "string" },
+              key: { type: "string", minLength: 1 },
+              limit: { type: "number", exclusiveMinimum: 0 },
+              window: { type: "number", exclusiveMinimum: 0 },
+              success: makeTargetJsonSchema(),
+              fallback: makeTargetJsonSchema(),
+            },
+          },
+        },
+      },
+      {
+        type: "object",
+        required: ["percentage"],
+        additionalProperties: false,
+        properties: {
+          percentage: {
+            type: "object",
+            minProperties: 1,
+            additionalProperties: makeTargetJsonSchema(),
+          },
+        },
+      },
+      {
+        type: "object",
+        required: ["fractional"],
+        additionalProperties: false,
+        properties: {
+          fractional: {
+            type: "object",
+            required: ["buckets"],
+            additionalProperties: false,
+            patternProperties: {
+              "^bucket\\d+$": makeTargetJsonSchema(),
+            },
+            properties: {
+              buckets: {
+                type: "array",
+                minItems: 1,
+                items: { type: "number", minimum: 0 },
+              },
+            },
+          },
+        },
+      },
+    ],
+  };
 }

@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "description": "Type-safe builder DSL for Cloudflare AI Gateway dynamic routes.",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/acitea/ai-gateway-routes.git"
+  },
+  "bugs": {
+    "url": "https://github.com/acitea/ai-gateway-routes/issues"
+  },
+  "homepage": "https://github.com/acitea/ai-gateway-routes#readme",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -16,14 +24,20 @@
     "agr": "./dist/cli.js"
   },
   "files": [
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
     "dist",
     "examples",
     "schemas",
+    "SECURITY.md",
     "scripts/update-cloudflare-schema.mjs",
     "README.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "ci": "npm run typecheck && npm test && npm run build && npm run pack:dry-run",
+    "pack:dry-run": "npm pack --dry-run --cache /tmp/ai-gateway-routes-npm-cache",
+    "prepublishOnly": "npm run ci",
     "schema:update": "node scripts/update-cloudflare-schema.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -45,6 +59,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
+    "ajv": "^8.20.0",
     "typescript": "^5.5.4",
     "vitest": "^2.1.1"
   }

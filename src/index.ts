@@ -38,6 +38,7 @@ export {
   YamlRouteJsonSchema,
   YamlRouteSchema,
   compileYamlRoute,
+  formatYamlRoute,
   parseYamlRoute,
   validateYamlRoute,
   yamlRouteToGraph,

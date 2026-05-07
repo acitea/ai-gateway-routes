@@ -1,5 +1,7 @@
+.DS_Store
 dist/
 node_modules/
+coverage/
 *.tgz
 vscode/node_modules/
 vscode/*.vsix

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import Ajv2020 from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import {
   CloudflareRouteSchema,
@@ -5,6 +7,7 @@ import {
   compileYamlRoute,
   compileRoute,
   defineRoute,
+  formatYamlRoute,
   validateYamlRoute,
   validateCompiledRoute,
   visualize,
@@ -468,6 +471,58 @@ nodes:
         outputs: {},
       },
     ]);
+  });
+
+  it("formats YAML manifests into a stable canonical layout", () => {
+    const yaml = `name: demo
+start: generate
+models: { openai: { provider: openai, model: gpt-4.1-mini, timeout: 30, retries: 2 } }
+nodes: { generate: { model: openai, success: end, fallback: end } }
+`;
+
+    expect(formatYamlRoute(yaml)).toMatchInlineSnapshot(`
+      "name: demo
+      start: generate
+      models:
+        openai:
+          provider: openai
+          model: gpt-4.1-mini
+          timeout: 30
+          retries: 2
+      nodes:
+        generate:
+          model: openai
+          success: end
+          fallback: end
+      "
+    `);
+  });
+
+  it("reports structural YAML diagnostics near the offending node", () => {
+    const yaml = `name: invalid
+start: generate
+nodes:
+  generate:
+    model: openai
+    success: end
+`;
+
+    expect(validateYamlRoute(yaml)[0]).toMatchObject({
+      line: 4,
+      column: 4,
+      severity: "error",
+    });
+  });
+
+  it("compiled YAML output satisfies Cloudflare's extracted route schema", () => {
+    const schema = JSON.parse(
+      readFileSync("schemas/cloudflare-route-create.schema.json", "utf8"),
+    ) as object;
+    const ajv = new Ajv2020({ strict: false });
+    const validate = ajv.compile(schema);
+    const compiled = compileYamlRoute(readFileSync("examples/auth-router.ai-gateway-route.yaml", "utf8"));
+
+    expect(validate(compiled), JSON.stringify(validate.errors, null, 2)).toBe(true);
   });
 
   it("reports YAML manifest diagnostics", () => {

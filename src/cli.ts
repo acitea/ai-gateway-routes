@@ -6,6 +6,7 @@ import { visualize } from "./visualize.js";
 import {
   YamlRouteJsonSchema,
   compileYamlRoute,
+  formatYamlRoute,
   validateYamlRoute,
 } from "./yaml.js";
 
@@ -14,14 +15,19 @@ type CliOptions = {
   accountId?: string;
   gatewayId?: string;
   apiToken?: string;
+  write?: boolean;
 };
 
 async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
 
   switch (command) {
+    case "check":
+      return checkCommand(rest);
     case "validate":
       return validateCommand(rest);
+    case "format":
+      return formatCommand(rest);
     case "compile":
       return compileCommand(rest);
     case "visualize":
@@ -52,6 +58,17 @@ async function validateCommand(args: string[]): Promise<number> {
     return 0;
   }
 
+  return printDiagnostics(file, diagnostics);
+}
+
+async function checkCommand(args: string[]): Promise<number> {
+  const { file } = parseFileArgs(args);
+  const source = await readFile(file, "utf8");
+  const diagnostics = validateYamlRoute(source);
+  return diagnostics.length === 0 ? 0 : printDiagnostics(file, diagnostics);
+}
+
+function printDiagnostics(file: string, diagnostics: ReturnType<typeof validateYamlRoute>): number {
   for (const diagnostic of diagnostics) {
     console.error(
       `${file}:${diagnostic.line + 1}:${diagnostic.column + 1} ${diagnostic.severity}: ${diagnostic.message}`,
@@ -59,6 +76,20 @@ async function validateCommand(args: string[]): Promise<number> {
   }
 
   return 1;
+}
+
+async function formatCommand(args: string[]): Promise<number> {
+  const { file, options } = parseFileArgs(args);
+  const source = await readFile(file, "utf8");
+  const formatted = formatYamlRoute(source);
+
+  if (options.write === true) {
+    await writeFile(file, formatted, "utf8");
+    return 0;
+  }
+
+  await writeOutput(options.output, formatted);
+  return 0;
 }
 
 async function compileCommand(args: string[]): Promise<number> {
@@ -149,6 +180,11 @@ function parseOptions(args: string[]): { positional: string[]; options: CliOptio
       continue;
     }
 
+    if (arg === "-w" || arg === "--write") {
+      options.write = true;
+      continue;
+    }
+
     if (arg?.startsWith("-")) {
       throw new Error(`Unknown option "${arg}".`);
     }
@@ -182,7 +218,9 @@ async function writeOutput(output: string | undefined, contents: string): Promis
 function printHelp(): void {
   const executable = basename(process.argv[1] ?? "ai-gateway-routes");
   console.error(`Usage:
+  ${executable} check <route.yaml>
   ${executable} validate <route.yaml>
+  ${executable} format <route.yaml> [-o route.yaml | --write]
   ${executable} compile <route.yaml> [-o route.json]
   ${executable} visualize <route.yaml> [-o route.mmd]
   ${executable} schema [-o ai-gateway-route.schema.json]

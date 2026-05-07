@@ -77,7 +77,9 @@ The CLI validates the same graph rules as the TypeScript builder:
 ## CLI
 
 ```sh
+ai-gateway-routes check <route.yaml>
 ai-gateway-routes validate <route.yaml>
+ai-gateway-routes format <route.yaml> [-o route.yaml | --write]
 ai-gateway-routes compile <route.yaml> [-o route.json]
 ai-gateway-routes visualize <route.yaml> [-o route.mmd]
 ai-gateway-routes schema [-o ai-gateway-route.schema.json]
@@ -85,6 +87,8 @@ ai-gateway-routes deploy <route.yaml> --account-id <id> --gateway-id <id> --api-
 ```
 
 The shorter `agr` binary is also available.
+
+`check` is quiet and intended for CI. `validate` prints a success message when the file is valid. `format` prints a canonical YAML layout unless `--write` is passed.
 
 Deploy credentials can be passed as flags or environment variables:
 
@@ -480,3 +484,12 @@ npm run schema:update
 ```
 
 JSON Schema catches API shape changes. The compiler still adds route-graph validation that JSON Schema cannot express, such as dangling references, unreachable nodes, cycles, and fractional bucket sums.
+
+## Development
+
+```sh
+npm install
+npm run ci
+```
+
+See `CONTRIBUTING.md`, `SECURITY.md`, and `CHANGELOG.md` for project maintenance details.

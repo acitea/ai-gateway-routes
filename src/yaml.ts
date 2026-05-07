@@ -1,4 +1,5 @@
-import { parseDocument } from "yaml";
+import { parseDocument, stringify } from "yaml";
+import type { Document } from "yaml";
 import { z } from "zod";
 import { compileRoute, validateRouteGraph } from "./compiler.js";
 import type {
@@ -72,6 +73,11 @@ export type YamlDiagnostic = {
   line: number;
   column: number;
   severity: YamlDiagnosticSeverity;
+};
+
+type ParsedYamlSource = {
+  document: Document.Parsed;
+  value: unknown;
 };
 
 const YamlTargetSchema: z.ZodType<YamlTarget> = z.lazy(() =>
@@ -226,7 +232,7 @@ export const YamlRouteJsonSchema = {
 } as const;
 
 export function parseYamlRoute(source: string): YamlRoute {
-  const value = parseYamlDocument(source);
+  const { value } = parseYamlSource(source);
   return YamlRouteSchema.parse(value);
 }
 
@@ -380,34 +386,49 @@ export function compileYamlRoute(source: string): CompiledRoute {
   return compileRoute(yamlRouteToGraph(parseYamlRoute(source)));
 }
 
+export function formatYamlRoute(source: string): string {
+  const route = parseYamlRoute(source);
+  return stringify(route, {
+    indent: 2,
+    lineWidth: 0,
+    sortMapEntries: false,
+  });
+}
+
 export function validateYamlRoute(source: string): YamlDiagnostic[] {
-  const parseDiagnostics = getParseDiagnostics(source);
+  const parsed = parseYamlSourceSafe(source);
+  const parseDiagnostics = getParseDiagnostics(parsed);
   if (parseDiagnostics.length > 0) {
     return parseDiagnostics;
   }
 
-  let route: YamlRoute;
-  try {
-    route = parseYamlRoute(source);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return error.issues.map((issue) => ({
-        message: `${formatPath(issue.path)}${issue.message}`,
-        line: 0,
-        column: 0,
-        severity: "error",
-      }));
-    }
-
+  if (parsed === undefined) {
     return [
       {
-        message: error instanceof Error ? error.message : "Invalid YAML route.",
+        message: "Invalid YAML route.",
         line: 0,
         column: 0,
         severity: "error",
       },
     ];
   }
+
+  let route: YamlRoute;
+  const routeResult = YamlRouteSchema.safeParse(parsed.value);
+
+  if (!routeResult.success) {
+    return routeResult.error.issues.map((issue) => {
+      const position = locateYamlPath(source, parsed.document, issue.path);
+      return {
+        message: `${formatPath(issue.path)}${issue.message}`,
+        line: position.line,
+        column: position.column,
+        severity: "error",
+      };
+    });
+  }
+
+  route = routeResult.data;
 
   try {
     const graphIssues = validateRouteGraph(yamlRouteToGraph(route));
@@ -429,7 +450,7 @@ export function validateYamlRoute(source: string): YamlDiagnostic[] {
   }
 }
 
-function parseYamlDocument(source: string): unknown {
+function parseYamlSource(source: string): ParsedYamlSource {
   const document = parseDocument(source, {
     prettyErrors: false,
     strict: true,
@@ -439,16 +460,41 @@ function parseYamlDocument(source: string): unknown {
     throw document.errors[0];
   }
 
-  return document.toJSON();
+  return {
+    document,
+    value: document.toJSON(),
+  };
 }
 
-function getParseDiagnostics(source: string): YamlDiagnostic[] {
-  const document = parseDocument(source, {
-    prettyErrors: false,
-    strict: true,
-  });
+function parseYamlSourceSafe(source: string): ParsedYamlSource | undefined {
+  try {
+    const document = parseDocument(source, {
+      prettyErrors: false,
+      strict: true,
+    });
 
-  return document.errors.map((error) => {
+    return {
+      document,
+      value: document.toJSON(),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function getParseDiagnostics(parsed: ParsedYamlSource | undefined): YamlDiagnostic[] {
+  if (parsed === undefined) {
+    return [
+      {
+        message: "Unable to parse YAML document.",
+        line: 0,
+        column: 0,
+        severity: "error",
+      },
+    ];
+  }
+
+  return parsed.document.errors.map((error) => {
     const linePosition = "linePos" in error ? error.linePos?.[0] : undefined;
     return {
       message: error.message,
@@ -457,6 +503,37 @@ function getParseDiagnostics(source: string): YamlDiagnostic[] {
       severity: "error",
     };
   });
+}
+
+function locateYamlPath(
+  source: string,
+  document: Document.Parsed,
+  path: (string | number)[],
+): { line: number; column: number } {
+  const node = document.getIn(path, true) as { range?: [number, number, number] } | undefined;
+  const offset = node?.range?.[0];
+
+  if (offset === undefined) {
+    return { line: 0, column: 0 };
+  }
+
+  return offsetToPosition(source, offset);
+}
+
+function offsetToPosition(source: string, offset: number): { line: number; column: number } {
+  let line = 0;
+  let column = 0;
+
+  for (let index = 0; index < offset; index += 1) {
+    if (source[index] === "\n") {
+      line += 1;
+      column = 0;
+    } else {
+      column += 1;
+    }
+  }
+
+  return { line, column };
 }
 
 function formatPath(path: (string | number)[]): string {

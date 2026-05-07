@@ -45,7 +45,7 @@ function createCompletionProvider() {
       const indent = line.match(/^\s*/)?.[0].length ?? 0;
 
       if (indent === 0) {
-        return ["name", "start", "nodes"].map((key) => yamlKeyCompletion(key));
+        return ["name", "start", "models", "nodes"].map((key) => yamlKeyCompletion(key));
       }
 
       if (indent === 4) {

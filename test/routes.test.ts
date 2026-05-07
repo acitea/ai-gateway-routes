@@ -307,12 +307,12 @@ describe("ai-gateway-routes", () => {
 
     expect(visualize(route)).toMatchInlineSnapshot(`
       "flowchart TD
-        start([start])
-        model[model]
-        end([end])
-        start -->|next| model
-        model -->|success| end
-        model -->|fallback| end"
+        node_start([start])
+        node_model[model]
+        node_end([end])
+        node_start -->|next| node_model
+        node_model -->|success| node_end
+        node_model -->|fallback| node_end"
     `);
   });
 
@@ -361,6 +361,113 @@ nodes:
         false: { elementId: "nvidia" },
       },
     });
+  });
+
+  it("compiles YAML model catalog references and inline branch nodes", () => {
+    const yaml = `
+name: inline-auth-router
+start: check-auth
+
+models:
+  openai:
+    provider: openai
+    model: gpt-4.1-mini
+    timeout: 30
+    retries: 2
+  nvidia:
+    provider: custom-nvidia
+    model: nvidia/llama-3.1-nemotron-nano-8b-v1
+    timeout: 30
+    retries: 2
+
+nodes:
+  check-auth:
+    conditional:
+      conditions:
+        metadata.signed_in:
+          $eq: true
+      true:
+        model: openai
+        success: end
+        fallback:
+          model: nvidia
+          success: end
+          fallback: end
+      false:
+        model: nvidia
+        success: end
+        fallback: end
+`;
+
+    const compiled = compileYamlRoute(yaml);
+
+    expect(compiled.elements).toEqual([
+      {
+        id: "start",
+        type: "start",
+        outputs: { next: { elementId: "check-auth" } },
+      },
+      {
+        id: "check-auth",
+        type: "conditional",
+        properties: {
+          conditions: {
+            "metadata.signed_in": { $eq: true },
+          },
+        },
+        outputs: {
+          true: { elementId: "check-auth-true" },
+          false: { elementId: "check-auth-false" },
+        },
+      },
+      {
+        id: "check-auth-true",
+        type: "model",
+        properties: {
+          provider: "openai",
+          model: "gpt-4.1-mini",
+          timeout: 30,
+          retries: 2,
+        },
+        outputs: {
+          success: { elementId: "end" },
+          fallback: { elementId: "check-auth-true-fallback" },
+        },
+      },
+      {
+        id: "check-auth-true-fallback",
+        type: "model",
+        properties: {
+          provider: "custom-nvidia",
+          model: "nvidia/llama-3.1-nemotron-nano-8b-v1",
+          timeout: 30,
+          retries: 2,
+        },
+        outputs: {
+          success: { elementId: "end" },
+          fallback: { elementId: "end" },
+        },
+      },
+      {
+        id: "check-auth-false",
+        type: "model",
+        properties: {
+          provider: "custom-nvidia",
+          model: "nvidia/llama-3.1-nemotron-nano-8b-v1",
+          timeout: 30,
+          retries: 2,
+        },
+        outputs: {
+          success: { elementId: "end" },
+          fallback: { elementId: "end" },
+        },
+      },
+      {
+        id: "end",
+        type: "end",
+        outputs: {},
+      },
+    ]);
   });
 
   it("reports YAML manifest diagnostics", () => {

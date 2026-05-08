@@ -1,4 +1,4 @@
-import { compileRoute } from "./compiler.js";
+import { compileRoute } from "./compiler";
 import type {
   BucketIndex,
   BucketName,
@@ -10,7 +10,7 @@ import type {
   PercentageProperties,
   RateProperties,
   RouteGraph,
-} from "./types.js";
+} from "./types";
 
 const RESERVED_ELEMENT_IDS = new Set(["start", "end"]);
 

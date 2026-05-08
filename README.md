@@ -493,6 +493,8 @@ JSON Schema catches API shape changes. The compiler still adds route-graph valid
 
 ## Development
 
+Building from source requires Node.js and Bun.
+
 ```sh
 npm install
 npm run ci

@@ -11,7 +11,7 @@ import {
   validateYamlRoute,
   validateCompiledRoute,
   visualize,
-} from "../src/index.js";
+} from "../src/index";
 
 describe("ai-gateway-routes", () => {
   it("compiles a simple linear route", () => {

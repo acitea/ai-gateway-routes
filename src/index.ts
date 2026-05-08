@@ -10,9 +10,9 @@ export {
   StartNode,
   defineRoute,
   type RoutableNode,
-} from "./builder.js";
-export { RouteValidationError, compileRoute } from "./compiler.js";
-export { DeployError, deploy } from "./deploy.js";
+} from "./builder";
+export { RouteValidationError, compileRoute } from "./compiler";
+export { DeployError, deploy } from "./deploy";
 export {
   CloudflareRouteSchema,
   ConditionalElementSchema,
@@ -28,8 +28,8 @@ export {
   validateCompiledRoute,
   type CloudflareRoute,
   type CloudflareRouteElement,
-} from "./validator.js";
-export { visualize } from "./visualize.js";
+} from "./validator";
+export { visualize } from "./visualize";
 export {
   YamlConditionalNodeSchema,
   YamlFractionalNodeSchema,
@@ -46,7 +46,7 @@ export {
   type YamlDiagnosticSeverity,
   type YamlNode,
   type YamlRoute,
-} from "./yaml.js";
+} from "./yaml";
 export type {
   BucketIndex,
   BucketName,
@@ -71,4 +71,4 @@ export type {
   RouteElement,
   RouteGraph,
   StartElement,
-} from "./types.js";
+} from "./types";

@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
 import { basename } from "node:path";
-import { deploy } from "./deploy.js";
-import { visualize } from "./visualize.js";
+import { deploy } from "./deploy";
+import { visualize } from "./visualize";
 import {
   YamlRouteJsonSchema,
   compileYamlRoute,
   formatYamlRoute,
   validateYamlRoute,
-} from "./yaml.js";
+} from "./yaml";
 
 type CliOptions = {
   output?: string;

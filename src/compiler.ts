@@ -9,8 +9,8 @@ import type {
   RouteElement,
   RouteGraph,
   StartElement,
-} from "./types.js";
-import { CloudflareRouteSchema } from "./validator.js";
+} from "./types";
+import { CloudflareRouteSchema } from "./validator";
 
 export class RouteValidationError extends Error {
   readonly issues: string[];

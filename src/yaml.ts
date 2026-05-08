@@ -1,15 +1,15 @@
 import { parseDocument, stringify } from "yaml";
 import type { Document } from "yaml";
 import { z } from "zod";
-import { compileRoute, validateRouteGraph } from "./compiler.js";
+import { compileRoute, validateRouteGraph } from "./compiler";
 import type {
   CompiledRoute,
   ElementDraft,
   FractionalProperties,
   PercentageProperties,
   RouteGraph,
-} from "./types.js";
-import { ConditionsSchema } from "./validator.js";
+} from "./types";
+import { ConditionsSchema } from "./validator";
 
 type YamlTarget = string | RawYamlNode;
 

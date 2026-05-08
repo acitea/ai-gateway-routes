@@ -1,5 +1,5 @@
-import type { RouteDefinition } from "./builder.js";
-import type { CompiledRoute, RouteElement } from "./types.js";
+import type { RouteDefinition } from "./builder";
+import type { CompiledRoute, RouteElement } from "./types";
 
 type VisualizableRoute = RouteDefinition | CompiledRoute;
 

@@ -2,6 +2,8 @@
 
 ## Development
 
+Building the package requires Node.js and Bun.
+
 ```sh
 npm install
 npm run typecheck

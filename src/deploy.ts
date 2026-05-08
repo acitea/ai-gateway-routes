@@ -1,6 +1,6 @@
-import type { RouteDefinition } from "./builder.js";
-import type { CompiledRoute, DeployOptions } from "./types.js";
-import { validateCompiledRoute } from "./validator.js";
+import type { RouteDefinition } from "./builder";
+import type { CompiledRoute, DeployOptions } from "./types";
+import { validateCompiledRoute } from "./validator";
 
 type DeployableRoute = RouteDefinition | CompiledRoute;
 

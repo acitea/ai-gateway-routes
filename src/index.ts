@@ -14,6 +14,13 @@ export {
 export { RouteValidationError, compileRoute } from "./compiler";
 export { DeployError, deploy } from "./deploy";
 export {
+  compileTerraformRoute,
+  type TerraformDynamicRoutingResource,
+  type TerraformRouteElement,
+  type TerraformRouteJson,
+  type TerraformRouteOptions,
+} from "./terraform";
+export {
   CloudflareRouteSchema,
   ConditionalElementSchema,
   ConditionExpressionSchema,

@@ -7,6 +7,7 @@ import {
   formatMissingDeployConfigMessage,
   resolveDeployConfig,
 } from "./deploy-config";
+import { compileTerraformRoute } from "./terraform";
 import { visualize } from "./visualize";
 import {
   YamlRouteJsonSchema,
@@ -20,6 +21,7 @@ type CliOptions = {
   accountId?: string;
   gatewayId?: string;
   apiToken?: string;
+  resourceName?: string;
   write?: boolean;
 };
 
@@ -37,6 +39,8 @@ async function main(argv: string[]): Promise<number> {
       return compileCommand(rest);
     case "visualize":
       return visualizeCommand(rest);
+    case "terraform":
+      return terraformCommand(rest);
     case "deploy":
       return deployCommand(rest);
     case "schema":
@@ -111,6 +115,23 @@ async function visualizeCommand(args: string[]): Promise<number> {
   const compiled = compileYamlRoute(source);
   await writeOutput(options.output, `${visualize(compiled)}\n`);
   return 0;
+}
+
+async function terraformCommand(args: string[]): Promise<number> {
+  const { file, options } = parseFileArgs(args);
+  const source = await readFile(file, "utf8");
+  const compiled = compileYamlRoute(source);
+  const terraform = compileTerraformRoute(compiled, makeTerraformOptions(options));
+  await writeOutput(options.output, `${JSON.stringify(terraform, null, 2)}\n`);
+  return 0;
+}
+
+function makeTerraformOptions(options: CliOptions): Parameters<typeof compileTerraformRoute>[1] {
+  return {
+    ...(options.accountId === undefined ? {} : { accountId: options.accountId }),
+    ...(options.gatewayId === undefined ? {} : { gatewayId: options.gatewayId }),
+    ...(options.resourceName === undefined ? {} : { resourceName: options.resourceName }),
+  };
 }
 
 async function deployCommand(args: string[]): Promise<number> {
@@ -192,6 +213,12 @@ function parseOptions(args: string[]): { positional: string[]; options: CliOptio
 
     if (arg === "--api-token") {
       options.apiToken = readOptionValue(args, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--resource-name") {
+      options.resourceName = readOptionValue(args, index, arg);
       index += 1;
       continue;
     }
@@ -313,6 +340,7 @@ function printHelp(): void {
   ${executable} format <route.yaml> [-o route.yaml | --write]
   ${executable} compile <route.yaml> [-o route.json]
   ${executable} visualize <route.yaml> [-o route.mmd]
+  ${executable} terraform <route.yaml> [-o route.tf.json] [--resource-name <name>] [--account-id <id>] [--gateway-id <id>]
   ${executable} schema [-o ai-gateway-route.schema.json]
   ${executable} deploy <route.yaml> [--account-id <id>] --gateway-id <id> --api-token <token>
 `);

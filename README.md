@@ -1,6 +1,10 @@
 # ai-gateway-routes
 
-Type-safe tooling for defining Cloudflare AI Gateway dynamic routes as YAML manifests or TypeScript builders, then compiling them to the flat JSON format accepted by the Cloudflare API.
+YAML authoring, validation, visualization, and deployment tooling for Cloudflare AI Gateway dynamic routes.
+
+Write readable route manifests, validate graph structure locally, render Mermaid diagrams, then either deploy directly to the Cloudflare API or generate Terraform JSON for `cloudflare_ai_gateway_dynamic_routing`.
+
+This project is not affiliated with or endorsed by Cloudflare, Inc. Cloudflare and Cloudflare AI Gateway are trademarks and/or registered trademarks of Cloudflare, Inc.
 
 ## Installation
 
@@ -60,6 +64,7 @@ Validate and compile it:
 ```sh
 ai-gateway-routes validate auth-router.ai-gateway-route.yaml
 ai-gateway-routes compile auth-router.ai-gateway-route.yaml -o route.json
+ai-gateway-routes terraform auth-router.ai-gateway-route.yaml -o route.tf.json
 ```
 
 The YAML format is intentionally manifest-like:
@@ -88,11 +93,12 @@ ai-gateway-routes validate <route.yaml>
 ai-gateway-routes format <route.yaml> [-o route.yaml | --write]
 ai-gateway-routes compile <route.yaml> [-o route.json]
 ai-gateway-routes visualize <route.yaml> [-o route.mmd]
+ai-gateway-routes terraform <route.yaml> [-o route.tf.json] [--resource-name <name>] [--account-id <id>] [--gateway-id <id>]
 ai-gateway-routes schema [-o ai-gateway-route.schema.json]
 ai-gateway-routes deploy <route.yaml> [--account-id <id>] --gateway-id <id> --api-token <token>
 ```
 
-`check` is quiet and intended for CI. `validate` prints a success message when the file is valid. `format` prints a canonical YAML layout unless `--write` is passed.
+`check` is quiet and intended for CI. `validate` prints a success message when the file is valid. `format` prints a canonical YAML layout unless `--write` is passed. `compile` emits Cloudflare API JSON. `terraform` emits Terraform `.tf.json` configuration.
 
 Deploy credentials can be passed as flags or environment variables. If `wrangler` is installed and logged in, the CLI can infer `accountId` from `wrangler whoami --json`; `gatewayId` and `apiToken` still need to come from flags or environment variables.
 
@@ -105,6 +111,46 @@ ai-gateway-routes deploy auth-router.ai-gateway-route.yaml
 ```
 
 The CLI also accepts `CF_ACCOUNT_ID`, `AI_GATEWAY_ID`, and `CF_API_TOKEN`.
+
+## Terraform
+
+Cloudflare's Terraform provider supports AI Gateway dynamic routes through `cloudflare_ai_gateway_dynamic_routing`. This package does not replace Terraform; it gives you a route-focused YAML format and compiler that can feed Terraform.
+
+```sh
+ai-gateway-routes terraform auth-router.ai-gateway-route.yaml -o ai-gateway-route.tf.json
+terraform plan
+terraform apply
+```
+
+By default, Terraform output references variables:
+
+```json
+{
+  "variable": {
+    "cloudflare_account_id": { "type": "string" },
+    "ai_gateway_id": { "type": "string" }
+  },
+  "resource": {
+    "cloudflare_ai_gateway_dynamic_routing": {
+      "auth_router": {
+        "account_id": "${var.cloudflare_account_id}",
+        "gateway_id": "${var.ai_gateway_id}",
+        "name": "auth-router",
+        "elements": []
+      }
+    }
+  }
+}
+```
+
+You can also bake in literal IDs:
+
+```sh
+ai-gateway-routes terraform auth-router.ai-gateway-route.yaml \
+  --account-id "$CLOUDFLARE_ACCOUNT_ID" \
+  --gateway-id "$CLOUDFLARE_GATEWAY_ID" \
+  -o ai-gateway-route.tf.json
+```
 
 ## YAML Element Types
 

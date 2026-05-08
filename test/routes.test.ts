@@ -6,6 +6,7 @@ import {
   RouteValidationError,
   compileYamlRoute,
   compileRoute,
+  compileTerraformRoute,
   defineRoute,
   formatYamlRoute,
   validateYamlRoute,
@@ -581,5 +582,133 @@ nodes:
       "gatewayId",
       "apiToken",
     ]);
+  });
+
+  it("compiles YAML routes to Terraform JSON configuration", () => {
+    const yaml = `
+name: auth-router
+start: check-auth
+models:
+  openai:
+    provider: openai
+    model: gpt-4.1-mini
+    timeout: 30
+    retries: 2
+nodes:
+  check-auth:
+    conditional:
+      conditions:
+        metadata.signed_in:
+          $eq: true
+      true: openai
+      false: end
+  openai:
+    model: openai
+    success: end
+    fallback: end
+`;
+
+    expect(compileTerraformRoute(compileYamlRoute(yaml))).toEqual({
+      variable: {
+        cloudflare_account_id: {
+          type: "string",
+        },
+        ai_gateway_id: {
+          type: "string",
+        },
+      },
+      resource: {
+        cloudflare_ai_gateway_dynamic_routing: {
+          auth_router: {
+            account_id: "${var.cloudflare_account_id}",
+            gateway_id: "${var.ai_gateway_id}",
+            name: "auth-router",
+            elements: [
+              {
+                id: "start",
+                type: "start",
+                outputs: {
+                  next: {
+                    element_id: "check-auth",
+                  },
+                },
+              },
+              {
+                id: "check-auth",
+                type: "conditional",
+                properties: {
+                  conditions: {
+                    "metadata.signed_in": {
+                      $eq: true,
+                    },
+                  },
+                },
+                outputs: {
+                  true: {
+                    element_id: "openai",
+                  },
+                  false: {
+                    element_id: "end",
+                  },
+                },
+              },
+              {
+                id: "openai",
+                type: "model",
+                properties: {
+                  ai_gateway_dynamic_routing_provider: "openai",
+                  model: "gpt-4.1-mini",
+                  timeout: 30,
+                  retries: 2,
+                },
+                outputs: {
+                  success: {
+                    element_id: "end",
+                  },
+                  fallback: {
+                    element_id: "end",
+                  },
+                },
+              },
+              {
+                id: "end",
+                type: "end",
+                outputs: {},
+              },
+            ],
+          },
+        },
+      },
+    });
+  });
+
+  it("supports literal Terraform account and gateway ids", () => {
+    const route = compileYamlRoute(`
+name: literal-ids
+start: openai
+models:
+  openai:
+    provider: openai
+    model: gpt-4.1-mini
+    timeout: 30
+    retries: 2
+nodes:
+  openai:
+    model: openai
+    success: end
+    fallback: end
+`);
+
+    const terraform = compileTerraformRoute(route, {
+      accountId: "account",
+      gatewayId: "gateway",
+      resourceName: "route",
+    });
+
+    expect(terraform.variable).toBeUndefined();
+    expect(terraform.resource.cloudflare_ai_gateway_dynamic_routing.route).toMatchObject({
+      account_id: "account",
+      gateway_id: "gateway",
+    });
   });
 });

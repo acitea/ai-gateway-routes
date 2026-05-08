@@ -12,6 +12,7 @@ import {
   validateCompiledRoute,
   visualize,
 } from "../src/index";
+import { resolveDeployConfig } from "../src/deploy-config";
 
 describe("ai-gateway-routes", () => {
   it("compiles a simple linear route", () => {
@@ -539,5 +540,46 @@ nodes:
     expect(validateYamlRoute(yaml).map((diagnostic) => diagnostic.message)).toContain(
       'Percentage element "split" buckets must sum to 1.',
     );
+  });
+
+  it("resolves deploy credentials from flags, env vars, and inferred Wrangler account id", () => {
+    expect(
+      resolveDeployConfig(
+        { gatewayId: "flag-gateway" },
+        {
+          CLOUDFLARE_ACCOUNT_ID: "env-account",
+          CLOUDFLARE_GATEWAY_ID: "env-gateway",
+          CLOUDFLARE_API_TOKEN: "env-token",
+        },
+        "wrangler-account",
+      ),
+    ).toEqual({
+      accountId: "env-account",
+      gatewayId: "flag-gateway",
+      apiToken: "env-token",
+      missing: [],
+    });
+
+    expect(
+      resolveDeployConfig(
+        {},
+        {
+          AI_GATEWAY_ID: "alias-gateway",
+          CF_API_TOKEN: "alias-token",
+        },
+        "wrangler-account",
+      ),
+    ).toEqual({
+      accountId: "wrangler-account",
+      gatewayId: "alias-gateway",
+      apiToken: "alias-token",
+      missing: [],
+    });
+
+    expect(resolveDeployConfig({}, {}, undefined).missing).toEqual([
+      "accountId",
+      "gatewayId",
+      "apiToken",
+    ]);
   });
 });

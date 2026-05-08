@@ -89,14 +89,12 @@ ai-gateway-routes format <route.yaml> [-o route.yaml | --write]
 ai-gateway-routes compile <route.yaml> [-o route.json]
 ai-gateway-routes visualize <route.yaml> [-o route.mmd]
 ai-gateway-routes schema [-o ai-gateway-route.schema.json]
-ai-gateway-routes deploy <route.yaml> --account-id <id> --gateway-id <id> --api-token <token>
+ai-gateway-routes deploy <route.yaml> [--account-id <id>] --gateway-id <id> --api-token <token>
 ```
-
-The shorter `agr` binary is also available.
 
 `check` is quiet and intended for CI. `validate` prints a success message when the file is valid. `format` prints a canonical YAML layout unless `--write` is passed.
 
-Deploy credentials can be passed as flags or environment variables:
+Deploy credentials can be passed as flags or environment variables. If `wrangler` is installed and logged in, the CLI can infer `accountId` from `wrangler whoami --json`; `gatewayId` and `apiToken` still need to come from flags or environment variables.
 
 ```sh
 CLOUDFLARE_ACCOUNT_ID=...
@@ -105,6 +103,8 @@ CLOUDFLARE_API_TOKEN=...
 
 ai-gateway-routes deploy auth-router.ai-gateway-route.yaml
 ```
+
+The CLI also accepts `CF_ACCOUNT_ID`, `AI_GATEWAY_ID`, and `CF_API_TOKEN`.
 
 ## YAML Element Types
 

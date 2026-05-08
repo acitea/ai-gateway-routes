@@ -1,7 +1,12 @@
 #!/usr/bin/env node
+import { execFile } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { deploy } from "./deploy";
+import {
+  formatMissingDeployConfigMessage,
+  resolveDeployConfig,
+} from "./deploy-config";
 import { visualize } from "./visualize";
 import {
   YamlRouteJsonSchema,
@@ -110,14 +115,25 @@ async function visualizeCommand(args: string[]): Promise<number> {
 
 async function deployCommand(args: string[]): Promise<number> {
   const { file, options } = parseFileArgs(args);
-  const accountId = options.accountId ?? process.env.CLOUDFLARE_ACCOUNT_ID;
-  const gatewayId = options.gatewayId ?? process.env.CLOUDFLARE_GATEWAY_ID;
-  const apiToken = options.apiToken ?? process.env.CLOUDFLARE_API_TOKEN;
+  const inferredAccountId =
+    options.accountId === undefined &&
+    process.env.CLOUDFLARE_ACCOUNT_ID === undefined &&
+    process.env.CF_ACCOUNT_ID === undefined
+      ? await inferWranglerAccountId()
+      : undefined;
+  const { accountId, gatewayId, apiToken, missing } = resolveDeployConfig(
+    options,
+    process.env,
+    inferredAccountId,
+  );
+
+  if (missing.length > 0) {
+    console.error(formatMissingDeployConfigMessage(missing));
+    return 1;
+  }
 
   if (accountId === undefined || gatewayId === undefined || apiToken === undefined) {
-    console.error(
-      "Missing deploy credentials. Pass --account-id, --gateway-id, --api-token or set CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_GATEWAY_ID, CLOUDFLARE_API_TOKEN.",
-    );
+    console.error(formatMissingDeployConfigMessage(["accountId", "gatewayId", "apiToken"]));
     return 1;
   }
 
@@ -215,6 +231,80 @@ async function writeOutput(output: string | undefined, contents: string): Promis
   await writeFile(output, contents, "utf8");
 }
 
+async function inferWranglerAccountId(): Promise<string | undefined> {
+  const stdout = await execWranglerWhoami();
+  if (stdout === undefined) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(stdout) as unknown;
+    const accountIds = extractWranglerAccountIds(parsed);
+    return accountIds.length === 1 ? accountIds[0] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function execWranglerWhoami(): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    execFile(
+      "wrangler",
+      ["whoami", "--json"],
+      { timeout: 5_000 },
+      (error: Error | null, stdout: string) => {
+        resolve(error === null ? stdout : undefined);
+      },
+    );
+  });
+}
+
+function extractWranglerAccountIds(value: unknown): string[] {
+  const ids = new Set<string>();
+
+  collectAccountIds(value, ids);
+
+  return [...ids];
+}
+
+function collectAccountIds(value: unknown, ids: Set<string>): void {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectAccountIds(item, ids);
+    }
+    return;
+  }
+
+  if (!isRecord(value)) {
+    return;
+  }
+
+  addStringValue(value.accountId, ids);
+  addStringValue(value.account_id, ids);
+
+  if (isRecord(value.account)) {
+    addStringValue(value.account.id, ids);
+  }
+
+  if (Array.isArray(value.accounts)) {
+    collectAccountIds(value.accounts, ids);
+  }
+
+  if (isRecord(value.result)) {
+    collectAccountIds(value.result, ids);
+  }
+}
+
+function addStringValue(value: unknown, ids: Set<string>): void {
+  if (typeof value === "string" && value.trim().length > 0) {
+    ids.add(value);
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function printHelp(): void {
   const executable = basename(process.argv[1] ?? "ai-gateway-routes");
   console.error(`Usage:
@@ -224,7 +314,7 @@ function printHelp(): void {
   ${executable} compile <route.yaml> [-o route.json]
   ${executable} visualize <route.yaml> [-o route.mmd]
   ${executable} schema [-o ai-gateway-route.schema.json]
-  ${executable} deploy <route.yaml> --account-id <id> --gateway-id <id> --api-token <token>
+  ${executable} deploy <route.yaml> [--account-id <id>] --gateway-id <id> --api-token <token>
 `);
 }
 

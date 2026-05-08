@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import Ajv2020 from "ajv/dist/2020.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   CloudflareRouteSchema,
   RouteValidationError,
@@ -308,15 +308,13 @@ describe("ai-gateway-routes", () => {
       model.onFallback().toEnd();
     });
 
-    expect(visualize(route)).toMatchInlineSnapshot(`
-      "flowchart TD
-        node_start([start])
-        node_model[model]
-        node_end([end])
-        node_start -->|next| node_model
-        node_model -->|success| node_end
-        node_model -->|fallback| node_end"
-    `);
+    expect(visualize(route)).toBe(`flowchart TD
+  node_start([start])
+  node_model[model]
+  node_end([end])
+  node_start -->|next| node_model
+  node_model -->|success| node_end
+  node_model -->|fallback| node_end`);
   });
 
   it("compiles the YAML manifest format", () => {
@@ -480,22 +478,20 @@ models: { openai: { provider: openai, model: gpt-4.1-mini, timeout: 30, retries:
 nodes: { generate: { model: openai, success: end, fallback: end } }
 `;
 
-    expect(formatYamlRoute(yaml)).toMatchInlineSnapshot(`
-      "name: demo
-      start: generate
-      models:
-        openai:
-          provider: openai
-          model: gpt-4.1-mini
-          timeout: 30
-          retries: 2
-      nodes:
-        generate:
-          model: openai
-          success: end
-          fallback: end
-      "
-    `);
+    expect(formatYamlRoute(yaml)).toBe(`name: demo
+start: generate
+models:
+  openai:
+    provider: openai
+    model: gpt-4.1-mini
+    timeout: 30
+    retries: 2
+nodes:
+  generate:
+    model: openai
+    success: end
+    fallback: end
+`);
   });
 
   it("reports structural YAML diagnostics near the offending node", () => {

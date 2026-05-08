@@ -26,6 +26,7 @@
   "files": [
     "CHANGELOG.md",
     "CONTRIBUTING.md",
+    "docs",
     "dist",
     "examples",
     "schemas",

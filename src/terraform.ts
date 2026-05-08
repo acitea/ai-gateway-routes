@@ -101,7 +101,7 @@ function toTerraformProperties(element: RouteElement): Record<string, unknown> |
   switch (element.type) {
     case "conditional":
       return {
-        conditions: (element as ConditionalElement).properties.conditions,
+        conditions: JSON.stringify((element as ConditionalElement).properties.conditions),
       };
     case "model": {
       const properties = (element as ModelElement).properties;

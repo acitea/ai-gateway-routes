@@ -637,11 +637,7 @@ nodes:
                 id: "check-auth",
                 type: "conditional",
                 properties: {
-                  conditions: {
-                    "metadata.signed_in": {
-                      $eq: true,
-                    },
-                  },
+                  conditions: '{"metadata.signed_in":{"$eq":true}}',
                 },
                 outputs: {
                   true: {

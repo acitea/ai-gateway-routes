@@ -116,6 +116,24 @@ The CLI also accepts `CF_ACCOUNT_ID`, `AI_GATEWAY_ID`, and `CF_API_TOKEN`.
 
 Cloudflare's Terraform provider supports AI Gateway dynamic routes through `cloudflare_ai_gateway_dynamic_routing`. This package does not replace Terraform; it gives you a route-focused YAML format and compiler that can feed Terraform.
 
+Make sure your Terraform project declares the Cloudflare provider:
+
+```json
+{
+  "terraform": {
+    "required_providers": {
+      "cloudflare": {
+        "source": "cloudflare/cloudflare",
+        "version": "~> 5.19"
+      }
+    }
+  },
+  "provider": {
+    "cloudflare": {}
+  }
+}
+```
+
 ```sh
 ai-gateway-routes terraform auth-router.ai-gateway-route.yaml -o ai-gateway-route.tf.json
 terraform plan

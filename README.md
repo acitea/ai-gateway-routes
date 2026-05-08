@@ -5,7 +5,13 @@ Type-safe tooling for defining Cloudflare AI Gateway dynamic routes as YAML mani
 ## Installation
 
 ```sh
-npm install ai-gateway-routes
+npm install --save-dev ai-gateway-routes
+```
+
+For a global CLI:
+
+```sh
+npm install -g ai-gateway-routes
 ```
 
 ## Quick Start
@@ -52,8 +58,8 @@ nodes:
 Validate and compile it:
 
 ```sh
-npx ai-gateway-routes validate auth-router.ai-gateway-route.yaml
-npx ai-gateway-routes compile auth-router.ai-gateway-route.yaml -o route.json
+ai-gateway-routes validate auth-router.ai-gateway-route.yaml
+ai-gateway-routes compile auth-router.ai-gateway-route.yaml -o route.json
 ```
 
 The YAML format is intentionally manifest-like:

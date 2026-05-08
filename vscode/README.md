@@ -1,8 +1,10 @@
 # AI Gateway Routes for VS Code
 
-This extension validates and previews `ai-gateway-routes` YAML manifests.
+Experimental editor support for Cloudflare AI Gateway route manifests written with `ai-gateway-routes`.
 
-Recognized file names:
+Open a route file to get schema validation, route diagnostics, Mermaid flow preview, JSON compilation, and Mermaid copy commands.
+
+Recognized files:
 
 - `*.ai-gateway-route.yaml`
 - `*.ai-gateway-route.yml`
@@ -14,13 +16,3 @@ Commands:
 - `AI Gateway Routes: Preview Flow`
 - `AI Gateway Routes: Compile to JSON`
 - `AI Gateway Routes: Copy Mermaid`
-
-For local development from this repository:
-
-```sh
-npm run build
-cd vscode
-npm install
-```
-
-Then open the `vscode/` folder in VS Code and run the extension host.

@@ -20,8 +20,8 @@
     }
   },
   "bin": {
-    "ai-gateway-routes": "./dist/cli.js",
-    "agr": "./dist/cli.js"
+    "ai-gateway-routes": "dist/cli.js",
+    "agr": "dist/cli.js"
   },
   "files": [
     "CHANGELOG.md",

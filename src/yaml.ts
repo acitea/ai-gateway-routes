@@ -591,6 +591,25 @@ function makeTargetJsonSchema(description?: string): object {
   };
 }
 
+function makeConditionsJsonSchema(): object {
+  return {
+    type: "object",
+    additionalProperties: {
+      type: "object",
+      minProperties: 1,
+      additionalProperties: false,
+      properties: {
+        $eq: {},
+        $neq: {},
+        $gt: {},
+        $lt: {},
+        $in: {},
+        $contains: {},
+      },
+    },
+  };
+}
+
 function makeNodeJsonSchema(): object {
   return {
     oneOf: [
@@ -634,7 +653,7 @@ function makeNodeJsonSchema(): object {
             required: ["conditions", "true", "false"],
             additionalProperties: false,
             properties: {
-              conditions: { type: "object" },
+              conditions: makeConditionsJsonSchema(),
               true: makeTargetJsonSchema(),
               false: makeTargetJsonSchema(),
             },

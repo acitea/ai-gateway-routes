@@ -186,7 +186,20 @@
                 "additionalProperties": false,
                 "properties": {
                   "conditions": {
-                    "type": "object"
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "minProperties": 1,
+                      "additionalProperties": false,
+                      "properties": {
+                        "$eq": {},
+                        "$neq": {},
+                        "$gt": {},
+                        "$lt": {},
+                        "$in": {},
+                        "$contains": {}
+                      }
+                    }
                   },
                   "true": {
                     "oneOf": [

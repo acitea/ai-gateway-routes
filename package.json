@@ -30,17 +30,19 @@
     "examples",
     "schemas",
     "SECURITY.md",
+    "scripts/fix-dts-imports.mjs",
     "scripts/update-cloudflare-schema.mjs",
     "README.md"
   ],
   "scripts": {
-    "build": "npm run clean && tsc -p tsconfig.json && bun build ./src/index.ts ./src/cli.ts --outdir dist --target node --format esm --sourcemap=external --external zod --external yaml",
-    "ci": "npm run typecheck && npm test && npm run build && npm run pack:dry-run",
+    "build": "npm run clean && tsc -p tsconfig.json && node scripts/fix-dts-imports.mjs && bun build ./src/index.ts ./src/cli.ts --outdir dist --target node --format esm --sourcemap=external --external zod --external yaml",
+    "ci": "npm run typecheck && npm test && npm run build && npm run test:types && npm run pack:dry-run",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "pack:dry-run": "npm pack --dry-run --cache /tmp/ai-gateway-routes-npm-cache",
     "prepublishOnly": "npm run ci",
     "schema:update": "node scripts/update-cloudflare-schema.mjs",
     "test": "bun test",
+    "test:types": "tsc -p test/typescript-nodenext/tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "keywords": [

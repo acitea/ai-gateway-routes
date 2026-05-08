@@ -5,3 +5,4 @@ coverage/
 *.tgz
 vscode/node_modules/
 vscode/*.vsix
+vscode/vendor/

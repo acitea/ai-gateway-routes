@@ -26,3 +26,5 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm pack --dry-run
+      - run: npm --prefix vscode install
+      - run: npm --prefix vscode run package

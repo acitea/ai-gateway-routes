@@ -8,8 +8,10 @@ import {
   compileRoute,
   compileTerraformRoute,
   defineRoute,
+  deploy,
   formatYamlRoute,
   validateYamlRoute,
+  validateCompiledRouteGraph,
   validateCompiledRoute,
   visualize,
 } from "../src/index";
@@ -279,6 +281,52 @@ describe("ai-gateway-routes", () => {
     expect(() => route.compile()).toThrow("Route contains a cycle:");
   });
 
+  it("validates graph semantics for externally supplied compiled JSON", async () => {
+    const compiled = {
+      name: "external-cycle",
+      elements: [
+        {
+          id: "start",
+          type: "start",
+          outputs: { next: { elementId: "model" } },
+        },
+        {
+          id: "model",
+          type: "model",
+          properties: {
+            provider: "openai",
+            model: "gpt-4.1-mini",
+            timeout: 30,
+            retries: 2,
+          },
+          outputs: {
+            success: { elementId: "end" },
+            fallback: { elementId: "model" },
+          },
+        },
+        {
+          id: "end",
+          type: "end",
+          outputs: {},
+        },
+      ],
+    } as const;
+
+    expect(validateCompiledRouteGraph(compiled).some((issue) => issue.startsWith("Route contains a cycle"))).toBe(
+      true,
+    );
+    await expect(
+      deploy(compiled, {
+        accountId: "account",
+        gatewayId: "gateway",
+        apiToken: "token",
+        fetch: (() => {
+          throw new Error("fetch should not be called for invalid route graphs");
+        }) as typeof fetch,
+      }),
+    ).rejects.toThrow("Route contains a cycle");
+  });
+
   it("validates the compiled JSON schema", () => {
     const route = defineRoute("schema", (b) => {
       const model = b.model("model", {
@@ -317,6 +365,54 @@ describe("ai-gateway-routes", () => {
   node_start -->|next| node_model
   node_model -->|success| node_end
   node_model -->|fallback| node_end`);
+  });
+
+  it("keeps Mermaid node ids unique when route ids normalize to the same value", () => {
+    expect(
+      visualize({
+        name: "collisions",
+        elements: [
+          {
+            id: "start",
+            type: "start",
+            outputs: { next: { elementId: "a-b" } },
+          },
+          {
+            id: "a-b",
+            type: "model",
+            properties: {
+              provider: "openai",
+              model: "gpt-4.1-mini",
+              timeout: 30,
+              retries: 2,
+            },
+            outputs: {
+              success: { elementId: "a_b" },
+              fallback: { elementId: "end" },
+            },
+          },
+          {
+            id: "a_b",
+            type: "model",
+            properties: {
+              provider: "openai",
+              model: "gpt-4.1-mini",
+              timeout: 30,
+              retries: 2,
+            },
+            outputs: {
+              success: { elementId: "end" },
+              fallback: { elementId: "end" },
+            },
+          },
+          {
+            id: "end",
+            type: "end",
+            outputs: {},
+          },
+        ],
+      }),
+    ).toContain("node_a_b_2[a_b]");
   });
 
   it("compiles the YAML manifest format", () => {

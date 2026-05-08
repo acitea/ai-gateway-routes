@@ -5,6 +5,10 @@
   "version": "0.1.0",
   "publisher": "ai-gateway-routes",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/acitea/ai-gateway-routes.git"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -71,13 +75,19 @@
       ]
     }
   },
-  "dependencies": {
-    "ai-gateway-routes": "file:.."
-  },
+  "files": [
+    "extension.js",
+    "language-configuration.json",
+    "schemas",
+    "vendor",
+    "README.md",
+    "LICENSE"
+  ],
   "devDependencies": {
     "@vscode/vsce": "^3.2.1"
   },
   "scripts": {
-    "package": "vsce package"
+    "prepare-core": "node scripts/prepare-core.mjs",
+    "package": "npm run prepare-core && vsce package"
   }
 }

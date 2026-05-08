@@ -11,7 +11,12 @@ export {
   defineRoute,
   type RoutableNode,
 } from "./builder";
-export { RouteValidationError, compileRoute } from "./compiler";
+export {
+  RouteValidationError,
+  assertValidCompiledRouteGraph,
+  compileRoute,
+  validateCompiledRouteGraph,
+} from "./compiler";
 export { DeployError, deploy } from "./deploy";
 export {
   compileTerraformRoute,

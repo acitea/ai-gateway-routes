@@ -1,4 +1,5 @@
 import type { RouteDefinition } from "./builder";
+import { assertValidCompiledRouteGraph } from "./compiler";
 import type { CompiledRoute, DeployOptions } from "./types";
 import { validateCompiledRoute } from "./validator";
 
@@ -16,7 +17,9 @@ export class DeployError extends Error {
 }
 
 export async function deploy(route: DeployableRoute, options: DeployOptions): Promise<unknown> {
-  const compiled = "compile" in route ? route.compile() : validateCompiledRoute(route);
+  const compiled = assertValidCompiledRouteGraph(
+    ("compile" in route ? route.compile() : validateCompiledRoute(route)) as CompiledRoute,
+  );
   const fetchImpl = options.fetch ?? globalThis.fetch;
 
   if (fetchImpl === undefined) {

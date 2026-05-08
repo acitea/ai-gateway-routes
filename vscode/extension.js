@@ -167,6 +167,7 @@ async function loadApi(context) {
 
 async function importApi(context) {
   const candidates = [
+    path.join(context.extensionPath, "vendor", "ai-gateway-routes", "index.js"),
     path.join(context.extensionPath, "node_modules", "ai-gateway-routes", "dist", "index.js"),
     path.join(context.extensionPath, "..", "dist", "index.js"),
     path.join(context.extensionPath, "..", "..", "dist", "index.js"),

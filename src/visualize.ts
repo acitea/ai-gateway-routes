@@ -6,14 +6,17 @@ type VisualizableRoute = RouteDefinition | CompiledRoute;
 export function visualize(route: VisualizableRoute): string {
   const compiled = "compile" in route ? route.compile() : route;
   const lines = ["flowchart TD"];
+  const nodeIds = makeNodeIdMap(compiled.elements);
 
   for (const element of compiled.elements) {
-    lines.push(`  ${nodeId(element.id)}${nodeShape(element)}`);
+    lines.push(`  ${nodeIds.get(element.id)}${nodeShape(element)}`);
   }
 
   for (const element of compiled.elements) {
     for (const [outputName, output] of Object.entries(element.outputs)) {
-      lines.push(`  ${nodeId(element.id)} -->|${escapeLabel(outputName)}| ${nodeId(output.elementId)}`);
+      lines.push(
+        `  ${nodeIds.get(element.id)} -->|${escapeLabel(outputName)}| ${nodeIds.get(output.elementId)}`,
+      );
     }
   }
 
@@ -39,8 +42,25 @@ function nodeShape(element: RouteElement): string {
   }
 }
 
-function nodeId(id: string): string {
-  return `node_${id.replace(/[^A-Za-z0-9_]/g, "_")}`;
+function makeNodeIdMap(elements: RouteElement[]): Map<string, string> {
+  const nodeIds = new Map<string, string>();
+  const used = new Set<string>();
+
+  for (const element of elements) {
+    const baseId = `node_${element.id.replace(/[^A-Za-z0-9_]/g, "_")}`;
+    let candidate = baseId;
+    let suffix = 2;
+
+    while (used.has(candidate)) {
+      candidate = `${baseId}_${suffix}`;
+      suffix += 1;
+    }
+
+    used.add(candidate);
+    nodeIds.set(element.id, candidate);
+  }
+
+  return nodeIds;
 }
 
 function escapeLabel(label: string): string {

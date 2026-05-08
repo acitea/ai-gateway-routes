@@ -37,6 +37,22 @@ export function compileRoute(graph: RouteGraph): CompiledRoute {
   return CloudflareRouteSchema.parse(route) as CompiledRoute;
 }
 
+export function validateCompiledRouteGraph(route: CompiledRoute): string[] {
+  return validateRouteGraph({
+    name: route.name,
+    elements: route.elements.map(toElementDraft),
+  });
+}
+
+export function assertValidCompiledRouteGraph(route: CompiledRoute): CompiledRoute {
+  const issues = validateCompiledRouteGraph(route);
+  if (issues.length > 0) {
+    throw new RouteValidationError(issues);
+  }
+
+  return route;
+}
+
 export function validateRouteGraph(graph: RouteGraph): string[] {
   const issues: string[] = [];
   const ids = new Set<string>();
@@ -195,6 +211,60 @@ function findCycle(elementsById: ReadonlyMap<string, ElementDraft>, startId: str
   }
 
   return visit(startId);
+}
+
+function toElementDraft(element: RouteElement): ElementDraft {
+  const outputs = new Map(
+    Object.entries(element.outputs).map(([name, output]) => [name, output.elementId]),
+  );
+
+  switch (element.type) {
+    case "start":
+      return {
+        id: element.id,
+        type: "start",
+        outputs,
+        requiredOutputs: ["next"],
+      };
+    case "end":
+      return {
+        id: element.id,
+        type: "end",
+        outputs,
+        requiredOutputs: [],
+      };
+    case "conditional":
+      return {
+        id: element.id,
+        type: "conditional",
+        properties: element.properties,
+        outputs,
+        requiredOutputs: ["true", "false"],
+      };
+    case "model":
+      return {
+        id: element.id,
+        type: "model",
+        properties: element.properties,
+        outputs,
+        requiredOutputs: ["success", "fallback"],
+      };
+    case "percentage":
+      return {
+        id: element.id,
+        type: "percentage",
+        outputs,
+        requiredOutputs: Object.keys(element.outputs),
+      };
+    case "rate":
+      return {
+        id: element.id,
+        type: "rate",
+        properties: element.properties,
+        outputs,
+        requiredOutputs: ["success", "fallback"],
+      };
+  }
 }
 
 function toRouteElement(element: ElementDraft): RouteElement {

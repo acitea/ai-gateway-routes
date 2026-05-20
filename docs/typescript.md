@@ -61,6 +61,7 @@ await deploy(route, {
 ```
 
 `deploy()` accepts either a builder route or compiled Cloudflare API JSON.
+It creates a route when the route name is new. If the gateway already has a route with the same name, it creates and deploys a new version for that route.
 
 ## Schemas
 

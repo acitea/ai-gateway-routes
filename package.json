@@ -1,6 +1,6 @@
 {
   "name": "ai-gateway-routes",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "YAML authoring, validation, visualization, and Terraform/API compilation for Cloudflare AI Gateway dynamic routes.",
   "type": "module",
   "repository": {

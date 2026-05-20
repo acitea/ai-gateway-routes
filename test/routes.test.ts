@@ -327,6 +327,108 @@ describe("ai-gateway-routes", () => {
     ).rejects.toThrow("Route contains a cycle");
   });
 
+  it("creates a Cloudflare route when no route with the same name exists", async () => {
+    const compiled = compileYamlRoute(`
+name: auth-router
+start: openai
+nodes:
+  openai:
+    model:
+      provider: openai
+      model: gpt-4.1-mini
+      timeout: 30
+      retries: 2
+      success: end
+      fallback: end
+`);
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({ url: String(input), init: init ?? {} });
+
+      if (requests.length === 1) {
+        return Promise.resolve(Response.json({ success: true, data: { page: 1, per_page: 100, routes: [] } }));
+      }
+
+      return Promise.resolve(Response.json({ success: true, result: { id: "new-route" } }));
+    }) as typeof globalThis.fetch;
+
+    await deploy(compiled, {
+      accountId: "account",
+      gatewayId: "gateway",
+      apiToken: "token",
+      baseUrl: "https://example.test/client/v4",
+      fetch,
+    });
+
+    expect(requests).toHaveLength(2);
+    expect(requests[0]).toMatchObject({
+      url: "https://example.test/client/v4/accounts/account/ai-gateway/gateways/gateway/routes?page=1&per_page=100",
+      init: { method: "GET" },
+    });
+    expect(requests[1]).toMatchObject({
+      url: "https://example.test/client/v4/accounts/account/ai-gateway/gateways/gateway/routes",
+      init: { method: "POST" },
+    });
+    expect(JSON.parse(requests[1].init.body as string)).toEqual(compiled);
+  });
+
+  it("creates and deploys a new version when a route with the same name exists", async () => {
+    const compiled = compileYamlRoute(`
+name: auth-router
+start: openai
+nodes:
+  openai:
+    model:
+      provider: openai
+      model: gpt-4.1-mini
+      timeout: 30
+      retries: 2
+      success: end
+      fallback: end
+`);
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    const fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({ url: String(input), init: init ?? {} });
+
+      if (requests.length === 1) {
+        return Promise.resolve(
+          Response.json({
+            success: true,
+            data: { page: 1, per_page: 100, routes: [{ id: "route-id", name: "auth-router" }] },
+          }),
+        );
+      }
+
+      if (requests.length === 2) {
+        return Promise.resolve(Response.json({ success: true, result: { version_id: "version-id" } }));
+      }
+
+      return Promise.resolve(Response.json({ success: true, result: { id: "deployment-id" } }));
+    }) as typeof globalThis.fetch;
+
+    await deploy(compiled, {
+      accountId: "account",
+      gatewayId: "gateway",
+      apiToken: "token",
+      baseUrl: "https://example.test/client/v4",
+      fetch,
+    });
+
+    expect(requests.map((request) => [request.init.method, request.url])).toEqual([
+      [
+        "GET",
+        "https://example.test/client/v4/accounts/account/ai-gateway/gateways/gateway/routes?page=1&per_page=100",
+      ],
+      ["POST", "https://example.test/client/v4/accounts/account/ai-gateway/gateways/gateway/routes/route-id/versions"],
+      [
+        "POST",
+        "https://example.test/client/v4/accounts/account/ai-gateway/gateways/gateway/routes/route-id/deployments",
+      ],
+    ]);
+    expect(JSON.parse(requests[1].init.body as string)).toEqual({ elements: compiled.elements });
+    expect(JSON.parse(requests[2].init.body as string)).toEqual({ version_id: "version-id" });
+  });
+
   it("validates the compiled JSON schema", () => {
     const route = defineRoute("schema", (b) => {
       const model = b.model("model", {
@@ -569,6 +671,98 @@ nodes:
     ]);
   });
 
+  it("compiles named inline conditional targets", () => {
+    const yaml = `
+name: named-inline-conditionals
+start: select-advanced
+nodes:
+  select-advanced:
+    conditional:
+      conditions:
+        metadata.capability:
+          $eq: ai.query.advanced
+      true:
+        - name: require-advanced-enabled
+          conditional:
+            conditions:
+              metadata.advanced_allowed:
+                $eq: true
+            true: end
+            false: basic
+      false: basic
+  basic:
+    model:
+      provider: groq
+      model: llama-3.1-8b
+      timeout: 30
+      retries: 2
+`;
+
+    const compiled = compileYamlRoute(yaml);
+
+    expect(compiled.elements.find((element) => element.id === "select-advanced")).toMatchObject({
+      id: "select-advanced",
+      type: "conditional",
+      outputs: {
+        true: { elementId: "require-advanced-enabled" },
+        false: { elementId: "basic" },
+      },
+    });
+    expect(compiled.elements.find((element) => element.id === "require-advanced-enabled")).toMatchObject({
+      id: "require-advanced-enabled",
+      type: "conditional",
+      outputs: {
+        true: { elementId: "end" },
+        false: { elementId: "basic" },
+      },
+    });
+  });
+
+  it("compiles model catalog fallback chains into route nodes", () => {
+    const yaml = `
+name: catalog-fallbacks
+start: basic-groq-llama
+models:
+  basic-groq-llama:
+    provider: groq
+    model: llama-3.1-8b
+    timeout: 30
+    retries: 2
+    fallback: basic-openrouter-qwen
+  basic-openrouter-qwen:
+    provider: openrouter
+    model: qwen/qwen3
+    timeout: 30
+    retries: 2
+nodes: {}
+`;
+
+    const compiled = compileYamlRoute(yaml);
+
+    expect(compiled.elements.find((element) => element.id === "basic-groq-llama")).toMatchObject({
+      id: "basic-groq-llama",
+      type: "model",
+      properties: {
+        provider: "groq",
+        model: "llama-3.1-8b",
+        timeout: 30,
+        retries: 2,
+      },
+      outputs: {
+        success: { elementId: "end" },
+        fallback: { elementId: "basic-openrouter-qwen" },
+      },
+    });
+    expect(compiled.elements.find((element) => element.id === "basic-openrouter-qwen")).toMatchObject({
+      id: "basic-openrouter-qwen",
+      type: "model",
+      outputs: {
+        success: { elementId: "end" },
+        fallback: { elementId: "end" },
+      },
+    });
+  });
+
   it("formats YAML manifests into a stable canonical layout", () => {
     const yaml = `name: demo
 start: generate
@@ -597,8 +791,10 @@ nodes:
 start: generate
 nodes:
   generate:
-    model: openai
-    success: end
+    model:
+      model: gpt-4.1-mini
+      timeout: 30
+      retries: 2
 `;
 
     expect(validateYamlRoute(yaml)[0]).toMatchObject({

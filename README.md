@@ -83,10 +83,12 @@ Routes use four top-level keys:
 
 - `name`: Cloudflare dynamic route name.
 - `start`: first node ID.
-- `models`: reusable model catalog.
+- `models`: reusable model catalog. Model entries may define `success` and `fallback` defaults.
 - `nodes`: route flow.
 
 `end` is built in.
+
+Prefer the readable YAML style: keep model configuration and fallback chains in `models`, and use named inline branch targets for local if/else logic. This keeps the route file close to how people reason about routing decisions while still compiling to Cloudflare's explicit element graph.
 
 Supported node types:
 
@@ -102,7 +104,6 @@ nodes:
 
   openai:
     model: openai
-    success: end
     fallback: nvidia
 
   limit:
@@ -123,6 +124,45 @@ nodes:
 ```
 
 Outputs can point to an existing node ID or contain an inline node.
+If an output points to a model name that is not also a top-level node ID, the compiler creates a model node from `models`.
+
+The original 1:1 graph mapping is still supported. You can define every Cloudflare route element under `nodes` with explicit `success`, `fallback`, `true`, and `false` outputs when you want direct control over the compiled graph.
+
+Recommended style:
+
+```yaml
+models:
+  basic-groq-llama:
+    provider: groq
+    model: llama-3.1-8b
+    timeout: 30
+    retries: 2
+    fallback: basic-openrouter-qwen
+
+  basic-openrouter-qwen:
+    provider: openrouter
+    model: qwen/qwen3
+    timeout: 30
+    retries: 2
+
+nodes:
+  select-advanced:
+    conditional:
+      conditions:
+        metadata.capability:
+          $eq: ai.query.advanced
+      true:
+        - name: require-advanced-enabled
+          conditional:
+            conditions:
+              metadata.advanced_allowed:
+                $eq: true
+            true: advanced
+            false: basic-groq-llama
+      false: basic-groq-llama
+```
+
+The `true` branch above defines a named inline conditional. That node is local to the branch in the YAML, but it compiles into a normal Cloudflare route element named `require-advanced-enabled`.
 
 ## Deploy
 
@@ -144,6 +184,10 @@ ai-gateway-routes deploy auth-router.ai-gateway-route.yaml \
 ```
 
 If `wrangler` is installed and logged in, the CLI can infer `accountId`. `gatewayId` and `apiToken` still need to come from flags or environment variables.
+
+`deploy` is idempotent by route name. If a route with the same `name` already exists in the gateway, the CLI creates a new route version and deploys it instead of creating a duplicate route.
+
+This matters because Cloudflare's create route endpoint only handles the first deploy. Updating an existing dynamic route requires creating a new route version and deploying that version, which this CLI now does automatically.
 
 ## Terraform
 

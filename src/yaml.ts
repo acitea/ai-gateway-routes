@@ -11,13 +11,15 @@ import type {
 } from "./types";
 import { ConditionsSchema } from "./validator";
 
-type YamlTarget = string | RawYamlNode;
+type YamlTarget = string | RawYamlNode | RawNamedYamlNode | RawNamedYamlNode[];
 
 type RawModelConfig = {
   provider: string;
   model: string;
   timeout: number;
   retries: number;
+  success?: YamlTarget | undefined;
+  fallback?: YamlTarget | undefined;
 };
 
 type RawYamlRoute = {
@@ -30,13 +32,13 @@ type RawYamlRoute = {
 type RawYamlNode =
   | {
       model: string;
-      success: YamlTarget;
-      fallback: YamlTarget;
+      success?: YamlTarget | undefined;
+      fallback?: YamlTarget | undefined;
     }
   | {
       model: RawModelConfig & {
-        success: YamlTarget;
-        fallback: YamlTarget;
+        success?: YamlTarget | undefined;
+        fallback?: YamlTarget | undefined;
       };
     }
   | {
@@ -66,6 +68,10 @@ type RawYamlNode =
       };
     };
 
+type RawNamedYamlNode = RawYamlNode & {
+  name: string;
+};
+
 export type YamlDiagnosticSeverity = "error" | "warning";
 
 export type YamlDiagnostic = {
@@ -81,7 +87,7 @@ type ParsedYamlSource = {
 };
 
 const YamlTargetSchema: z.ZodType<YamlTarget> = z.lazy(() =>
-  z.union([z.string().min(1), YamlNodeSchema]),
+  z.union([z.string().min(1), YamlNodeSchema, YamlNamedNodeSchema, z.array(YamlNamedNodeSchema).min(1)]),
 );
 
 const YamlModelConfigSchema = z
@@ -90,6 +96,8 @@ const YamlModelConfigSchema = z
     model: z.string().min(1),
     timeout: z.number().positive(),
     retries: z.number().int().nonnegative(),
+    success: YamlTargetSchema.optional(),
+    fallback: YamlTargetSchema.optional(),
   })
   .strict();
 
@@ -97,17 +105,14 @@ export const YamlModelNodeSchema = z
   .union([
     z
       .object({
-        model: YamlModelConfigSchema.extend({
-          success: YamlTargetSchema,
-          fallback: YamlTargetSchema,
-        }).strict(),
+        model: YamlModelConfigSchema,
       })
       .strict(),
     z
       .object({
         model: z.string().min(1),
-        success: YamlTargetSchema,
-        fallback: YamlTargetSchema,
+        success: YamlTargetSchema.optional(),
+        fallback: YamlTargetSchema.optional(),
       })
       .strict(),
   ]);
@@ -199,6 +204,104 @@ export const YamlNodeSchema = z.union([
   YamlRateNodeSchema,
 ]);
 
+const YamlNamedNodeSchema: z.ZodType<RawNamedYamlNode> = z.lazy(() =>
+  z.union([
+    z
+      .object({
+        name: z.string().min(1),
+        model: YamlModelConfigSchema,
+      })
+      .strict(),
+    z
+      .object({
+        name: z.string().min(1),
+        model: z.string().min(1),
+        success: YamlTargetSchema.optional(),
+        fallback: YamlTargetSchema.optional(),
+      })
+      .strict(),
+    z
+      .object({
+        name: z.string().min(1),
+        conditional: z
+          .object({
+            conditions: ConditionsSchema,
+            true: YamlTargetSchema,
+            false: YamlTargetSchema,
+          })
+          .strict(),
+      })
+      .strict(),
+    z
+      .object({
+        name: z.string().min(1),
+        rate: z
+          .object({
+            limitType: z.enum(["count", "cost"]),
+            key: z.string().min(1),
+            limit: z.number().positive(),
+            window: z.number().positive(),
+            success: YamlTargetSchema,
+            fallback: YamlTargetSchema,
+          })
+          .strict(),
+      })
+      .strict(),
+    z
+      .object({
+        name: z.string().min(1),
+        percentage: z.record(z.string().min(1), YamlTargetSchema).refine(
+          (outputs) => Object.keys(outputs).length > 0,
+          "Percentage nodes must define at least one output.",
+        ),
+      })
+      .strict(),
+    z
+      .object({
+        name: z.string().min(1),
+        fractional: z
+          .object({
+            buckets: z.array(z.number().nonnegative()).min(1),
+          })
+          .catchall(YamlTargetSchema)
+          .superRefine((node, context) => {
+            const expectedOutputs = node.buckets.map((_, index) => `bucket${index}`);
+            const outputNames = Object.keys(node).filter((key) => key !== "buckets");
+
+            for (const expectedOutput of expectedOutputs) {
+              if (!outputNames.includes(expectedOutput)) {
+                context.addIssue({
+                  code: z.ZodIssueCode.custom,
+                  path: [expectedOutput],
+                  message: `Missing output "${expectedOutput}".`,
+                });
+              }
+            }
+
+            for (const outputName of outputNames) {
+              if (!/^bucket\d+$/.test(outputName)) {
+                context.addIssue({
+                  code: z.ZodIssueCode.custom,
+                  path: [outputName],
+                  message: `Unexpected fractional key "${outputName}". Use bucket0, bucket1, ...`,
+                });
+                continue;
+              }
+
+              if (!expectedOutputs.includes(outputName)) {
+                context.addIssue({
+                  code: z.ZodIssueCode.custom,
+                  path: [outputName],
+                  message: `Unexpected output "${outputName}" for ${node.buckets.length} buckets.`,
+                });
+              }
+            }
+          }),
+      })
+      .strict(),
+  ]),
+);
+
 export const YamlRouteSchema = z
   .object({
     name: z.string().min(1),
@@ -246,10 +349,28 @@ export function yamlRouteToGraph(route: YamlRoute): RouteGraph {
   };
   const elements: ElementDraft[] = [startElement];
   const usedIds = new Set(["start", "end", ...Object.keys(rawRoute.nodes)]);
+  const addedIds = new Set(["start"]);
 
   function resolveTarget(target: YamlTarget, preferredId: string): string {
     if (typeof target === "string") {
+      maybeAddReferencedModel(target);
       return target;
+    }
+
+    if (Array.isArray(target)) {
+      const firstTarget = target[0];
+      if (firstTarget === undefined) {
+        throw new Error("Inline target arrays must contain at least one node.");
+      }
+
+      for (const namedNode of target) {
+        addNamedNode(namedNode);
+      }
+      return firstTarget.name;
+    }
+
+    if (isNamedYamlNode(target)) {
+      return addNamedNode(target);
     }
 
     const inlineId = reserveInlineId(preferredId, usedIds);
@@ -257,45 +378,78 @@ export function yamlRouteToGraph(route: YamlRoute): RouteGraph {
     return inlineId;
   }
 
+  function addNamedNode(node: RawNamedYamlNode): string {
+    const { name, ...rawNode } = node;
+    if (usedIds.has(name)) {
+      throw new Error(`Inline node name "${name}" is already used.`);
+    }
+
+    usedIds.add(name);
+    addNode(name, rawNode as RawYamlNode);
+    return name;
+  }
+
+  function maybeAddReferencedModel(id: string): void {
+    if (id === "end" || rawRoute.nodes[id] !== undefined || addedIds.has(id)) {
+      return;
+    }
+
+    const model = rawRoute.models?.[id];
+    if (model !== undefined) {
+      addModelElement(id, model);
+    }
+  }
+
+  function addModelElement(
+    id: string,
+    model: RawModelConfig,
+    successOverride?: YamlTarget,
+    fallbackOverride?: YamlTarget,
+  ): void {
+    if (addedIds.has(id)) {
+      return;
+    }
+
+    addedIds.add(id);
+    const { success, fallback, ...properties } = model;
+    const element: ElementDraft = {
+      id,
+      type: "model",
+      properties,
+      outputs: new Map(),
+      requiredOutputs: ["success", "fallback"],
+    };
+    elements.push(element);
+    element.outputs.set("success", resolveTarget(successOverride ?? success ?? "end", `${id}-success`));
+    element.outputs.set("fallback", resolveTarget(fallbackOverride ?? fallback ?? "end", `${id}-fallback`));
+  }
+
   function addNode(id: string, node: RawYamlNode): void {
+    if (addedIds.has(id)) {
+      return;
+    }
+
     if ("model" in node) {
       if (typeof node.model === "string") {
         const modelNode = node as {
           model: string;
-          success: YamlTarget;
-          fallback: YamlTarget;
+          success?: YamlTarget | undefined;
+          fallback?: YamlTarget | undefined;
         };
         const model = rawRoute.models?.[modelNode.model];
         if (model === undefined) {
           throw new Error(`Model "${modelNode.model}" is not defined in root models.`);
         }
 
-        const element: ElementDraft = {
-          id,
-          type: "model",
-          properties: model,
-          outputs: new Map(),
-          requiredOutputs: ["success", "fallback"],
-        };
-        elements.push(element);
-        element.outputs.set("success", resolveTarget(modelNode.success, `${id}-success`));
-        element.outputs.set("fallback", resolveTarget(modelNode.fallback, `${id}-fallback`));
+        addModelElement(id, model, modelNode.success, modelNode.fallback);
         return;
       }
 
-      const { success, fallback, ...properties } = node.model;
-      const element: ElementDraft = {
-        id,
-        type: "model",
-        properties,
-        outputs: new Map(),
-        requiredOutputs: ["success", "fallback"],
-      };
-      elements.push(element);
-      element.outputs.set("success", resolveTarget(success, `${id}-success`));
-      element.outputs.set("fallback", resolveTarget(fallback, `${id}-fallback`));
+      addModelElement(id, node.model);
       return;
     }
+
+    addedIds.add(id);
 
     if ("conditional" in node) {
       const { conditions, true: trueTarget, false: falseTarget } = node.conditional;
@@ -563,6 +717,10 @@ function reserveInlineId(preferredId: string, usedIds: Set<string>): string {
   return candidate;
 }
 
+function isNamedYamlNode(value: unknown): value is RawNamedYamlNode {
+  return typeof value === "object" && value !== null && !Array.isArray(value) && "name" in value;
+}
+
 function sanitizeIdPart(value: string): string {
   return value
     .trim()
@@ -580,6 +738,8 @@ function makeModelConfigJsonSchema(): object {
       model: { type: "string", minLength: 1 },
       timeout: { type: "number", exclusiveMinimum: 0 },
       retries: { type: "integer", minimum: 0 },
+      success: makeTargetJsonSchema(),
+      fallback: makeTargetJsonSchema(),
     },
   };
 }
@@ -587,7 +747,17 @@ function makeModelConfigJsonSchema(): object {
 function makeTargetJsonSchema(description?: string): object {
   return {
     ...(description === undefined ? {} : { description }),
-    oneOf: [{ type: "string", minLength: 1 }, { type: "object" }],
+    oneOf: [
+      { type: "string", minLength: 1 },
+      { type: "object" },
+      {
+        type: "array",
+        minItems: 1,
+        items: {
+          allOf: [{ type: "object", required: ["name"] }, { type: "object" }],
+        },
+      },
+    ],
   };
 }
 
@@ -635,7 +805,7 @@ function makeNodeJsonSchema(): object {
       },
       {
         type: "object",
-        required: ["model", "success", "fallback"],
+        required: ["model"],
         additionalProperties: false,
         properties: {
           model: { type: "string", minLength: 1 },

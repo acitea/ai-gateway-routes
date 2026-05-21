@@ -10,7 +10,7 @@
   "bugs": {
     "url": "https://github.com/acitea/ai-gateway-routes/issues"
   },
-  "homepage": "https://github.com/acitea/ai-gateway-routes#readme",
+  "homepage": "https://acitea.github.io/ai-gateway-routes/",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -26,7 +26,8 @@
   "files": [
     "CHANGELOG.md",
     "CONTRIBUTING.md",
-    "docs",
+    "docs/typescript.md",
+    "docs/typescript-compatibility.md",
     "dist",
     "examples",
     "schemas",

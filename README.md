@@ -6,6 +6,8 @@ Write a readable route file, check it locally, preview the flow, then deploy it 
 
 This project is not affiliated with or endorsed by Cloudflare, Inc. Cloudflare and Cloudflare AI Gateway are trademarks and/or registered trademarks of Cloudflare, Inc.
 
+Full documentation: <https://acitea.github.io/ai-gateway-routes/>
+
 ## Install
 
 ```sh

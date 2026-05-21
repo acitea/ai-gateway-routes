@@ -4,6 +4,7 @@ export default defineConfig({
   title: "ai-gateway-routes",
   description: "YAML tooling for Cloudflare AI Gateway dynamic routes.",
   base: "/ai-gateway-routes/",
+  outDir: "../docs",
   cleanUrls: true,
   lastUpdated: true,
   themeConfig: {
@@ -45,7 +46,7 @@ export default defineConfig({
       provider: "local",
     },
     editLink: {
-      pattern: "https://github.com/acitea/ai-gateway-routes/edit/main/docs/:path",
+      pattern: "https://github.com/acitea/ai-gateway-routes/edit/main/docs-source/:path",
       text: "Edit this page on GitHub",
     },
     footer: {
